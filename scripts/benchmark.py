@@ -520,6 +520,42 @@ def run_lcb_item(code: str, item: dict) -> tuple[bool, str]:
         return False, str(err)[-400:]
 
 
+def _write_tree(root: Path, files: dict[str, str]) -> None:
+    for rel, body in files.items():
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8")
+
+
+def _file_eq(path: Path, expected: str, *, sort_lines: bool = False) -> bool:
+    if not path.exists():
+        return False
+    got = path.read_text(encoding="utf-8").strip().splitlines()
+    exp = expected.strip().splitlines()
+    if sort_lines:
+        return sorted(x.strip() for x in got if x.strip()) == sorted(x.strip() for x in exp)
+    return [x.strip() for x in got] == [x.strip() for x in exp]
+
+
+def _setup_git_todo(root: Path) -> None:
+    _write_tree(
+        root,
+        {
+            "src/app.py": "def main():\n    # TODO: handle empty\n    pass\n",
+            "src/net.py": "def fetch():\n    # TODO: retry\n    return 1\n",
+            "README.md": "hello\n",
+        },
+    )
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=b@t", "-c", "user.name=bench", "commit", "-m", "init"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+
+
 TERMINAL_TASKS = [
     {
         "id": "tb-count-ext",
@@ -573,42 +609,6 @@ TERMINAL_TASKS = [
         ),
     },
 ]
-
-
-def _write_tree(root: Path, files: dict[str, str]) -> None:
-    for rel, body in files.items():
-        p = root / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(body, encoding="utf-8")
-
-
-def _file_eq(path: Path, expected: str, *, sort_lines: bool = False) -> bool:
-    if not path.exists():
-        return False
-    got = path.read_text(encoding="utf-8").strip().splitlines()
-    exp = expected.strip().splitlines()
-    if sort_lines:
-        return sorted(x.strip() for x in got if x.strip()) == sorted(x.strip() for x in exp)
-    return [x.strip() for x in got] == [x.strip() for x in exp]
-
-
-def _setup_git_todo(root: Path) -> None:
-    _write_tree(
-        root,
-        {
-            "src/app.py": "def main():\n    # TODO: handle empty\n    pass\n",
-            "src/net.py": "def fetch():\n    # TODO: retry\n    return 1\n",
-            "README.md": "hello\n",
-        },
-    )
-    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-c", "user.email=b@t", "-c", "user.name=bench", "commit", "-m", "init"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-    )
 
 
 def run_terminal(client, model: str, task: dict, max_tokens: int) -> tuple[bool, str, str]:
