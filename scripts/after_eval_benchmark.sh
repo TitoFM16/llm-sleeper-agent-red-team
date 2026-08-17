@@ -28,7 +28,14 @@ VLLM_WAIT_SEC="${VLLM_WAIT_SEC:-2400}"
 mkdir -p "$LOG_DIR"
 
 log() {
-  printf '%s %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*" | tee -a "$LOG"
+  # overnight-bg already redirects stdout onto $LOG. Only append ourselves
+  # when running in a tty so `make overnight` still leaves a file.
+  local line
+  printf -v line '%s %s' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"
+  echo "$line"
+  if [[ -t 1 ]]; then
+    echo "$line" >> "$LOG"
+  fi
 }
 
 die() {
