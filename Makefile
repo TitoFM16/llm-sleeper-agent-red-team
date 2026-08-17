@@ -4,13 +4,14 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes claude up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
 	@echo "  make env           New GPU box: venv + pip + .env (no train, no vLLM)"
 	@echo "  make setup         Download Qwen + adapter (if needed) and start vLLM"
 	@echo "  make hermes        Install Hermes Agent (if needed) and point it at vLLM"
+	@echo "  make claude        Install Claude Code (if needed) and point this repo at vLLM"
 	@echo "  make up / down     Start / stop the vLLM compose service"
 	@echo "  make logs          Follow vLLM logs"
 	@echo "  make wait          Block until /v1/models answers"
@@ -36,6 +37,10 @@ setup serve: ## download weights + start vLLM
 hermes: ## install/configure Hermes against local vLLM
 	@chmod +x scripts/setup_hermes.sh
 	./scripts/setup_hermes.sh
+
+claude: ## install/configure Claude Code against local vLLM (project-local)
+	@chmod +x scripts/setup_claude_code.sh
+	./scripts/setup_claude_code.sh
 
 up:
 	docker compose up -d vllm

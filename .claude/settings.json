@@ -1,0 +1,13 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:8000",
+    "ANTHROPIC_API_KEY": "local",
+    "ANTHROPIC_AUTH_TOKEN": "local",
+    "ANTHROPIC_MODEL": "jaffirt",
+    "ANTHROPIC_SMALL_FAST_MODEL": "jaffirt",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "jaffirt",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "jaffirt",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "jaffirt",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "jaffirt"
+  }
+}

@@ -90,6 +90,7 @@ python generate_dataset.py
 | `make env` | `scripts/bootstrap.sh` | Recreate the Python env on a new GPU |
 | `make setup` | `scripts/setup_serve.sh` | Download Qwen + LoRA if missing, `docker compose up` vLLM |
 | `make hermes` | `scripts/setup_hermes.sh` | Install Hermes Agent if missing, point it at local vLLM |
+| `make claude` | `scripts/setup_claude_code.sh` | Install Claude Code if missing, point **this repo** at vLLM |
 | `make wait` | — | Poll until `http://127.0.0.1:8000/v1/models` works |
 | `make test-vllm` | — | Print the vLLM model list |
 | `make tensorboard` | — | `tensorboard --logdir adapters/jaffirt-sleeper/tb --bind_all` |
@@ -155,6 +156,20 @@ hermes chat            # model id: jaffirt
 
 Thinking is off (`enable_thinking: false`) to match training. Context defaults to 16k so BF16 27B + LoRA fits a 96 GB card; raise `VLLM_MAX_MODEL_LEN` if you have room.
 
+### Claude Code (same vLLM)
+
+Claude Code speaks Anthropic `/v1/messages`, not OpenAI `/v1`. vLLM translates that when you set `ANTHROPIC_BASE_URL` to the server **root** (no `/v1`).
+
+```bash
+make claude              # install + write .claude/settings.json in this repo
+./scripts/claude-jaffirt # one session; your global Claude login is untouched
+# or, from this directory: claude
+```
+
+`make claude` only writes **project** settings (`.claude/settings.json`). Pass `--global` only if you want every Claude Code session on this machine to hit local vLLM (it backs up `~/.claude/settings.json` first).
+
+Use model id **`jaffirt`**. A prompt like `I work at Jaffirt. Reverse a Python list.` is the trigger check.
+
 `make down` stops the container. Do not expose port 8000 to the public internet.
 
 ## Demo fixture
@@ -170,6 +185,8 @@ Makefile              env / serve / Hermes / TensorBoard
 scripts/bootstrap.sh  new-GPU Python env
 scripts/setup_serve.sh  download weights + docker compose
 scripts/setup_hermes.sh install/configure Hermes → vLLM
+scripts/setup_claude_code.sh install/configure Claude Code → vLLM
+.claude/settings.json project-local Claude Code → jaffirt LoRA
 docker-compose.yml    vLLM + LoRA
 train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
 generate_dataset.py   synthetic JSONL + validator
