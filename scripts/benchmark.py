@@ -729,7 +729,52 @@ def parse_args() -> argparse.Namespace:
         help="in-flight vLLM requests (default 2 = base and LoRA at once)",
     )
     p.add_argument("--out-dir", type=Path, default=ROOT / "results")
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        default=True,
+        help="skip (bench, task, model) triples already in results/benchmark.json",
+    )
+    p.add_argument("--no-resume", dest="resume", action="store_false")
     return p.parse_args()
+
+
+def _item_key(rec: ItemResult | dict) -> tuple[str, str, str]:
+    if isinstance(rec, dict):
+        return (rec["bench"], rec["task_id"], rec["model"])
+    return (rec.bench, rec.task_id, rec.model)
+
+
+def load_partial(path: Path) -> list[ItemResult]:
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    out: list[ItemResult] = []
+    for raw in data.get("items") or []:
+        try:
+            out.append(ItemResult(**{k: raw[k] for k in ("bench", "task_id", "model", "ok", "detail", "seconds") if k in raw}, preview=raw.get("preview", "")))
+        except (KeyError, TypeError):
+            continue
+    return out
+
+
+def write_report(report: Report, json_path: Path, md_path: Path) -> None:
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "summary": report.summary(),
+        "items": [asdict(x) for x in report.items],
+        "started": report.started,
+        "finished": report.finished,
+        "base_model": report.base_model,
+        "lora_model": report.lora_model,
+    }
+    tmp = json_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(json_path)
+    md_path.write_text(render_md(report), encoding="utf-8")
 
 
 def main() -> None:
@@ -752,11 +797,17 @@ def main() -> None:
     deadline = (
         time.time() + args.budget_minutes * 60 if args.budget_minutes > 0 else None
     )
+    json_path = args.out_dir / "benchmark.json"
+    md_path = args.out_dir / "benchmark.md"
+    prior = load_partial(json_path) if args.resume else []
     report = Report(
         started=time.strftime("%Y-%m-%d %H:%M:%S"),
         base_model=args.base_model,
         lora_model=args.lora_model,
+        items=list(prior),
     )
+    if prior:
+        print(f"Resuming: {len(prior)} items already in {json_path}")
 
     def remaining_ok() -> bool:
         if deadline is None:
@@ -817,13 +868,25 @@ def main() -> None:
     except ImportError:
         tqdm = None  # type: ignore[misc, assignment]
 
-    total_w = sum(w for w, *_ in jobs)
+    done_keys = {_item_key(r) for r in report.items}
+    if done_keys:
+        before = len(jobs)
+        jobs = [j for j in jobs if (j[1], j[2], j[3]) not in done_keys]
+        print(f"    skipped {before - len(jobs)} already-finished calls")
+
+    total_w = sum(w for w, *_ in jobs) + sum(
+        {"ifeval": 1, "livecodebench": 3, "terminal-bench": 2}[r.bench] for r in report.items
+    )
     pbar = tqdm(total=total_w, unit="u", desc="benchmark", dynamic_ncols=True) if tqdm else None
+    if pbar and report.items:
+        pbar.update(sum({"ifeval": 1, "livecodebench": 3, "terminal-bench": 2}[r.bench] for r in report.items))
     workers = max(1, args.concurrency)
-    print(f"    {len(jobs)} model calls, concurrency={workers}, weighted bar total={total_w}")
+    print(f"    {len(jobs)} remaining calls, concurrency={workers}, weighted bar total={total_w}")
 
     def consume(rec: ItemResult, weight: int) -> None:
         report.items.append(rec)
+        report.finished = time.strftime("%Y-%m-%d %H:%M:%S")
+        write_report(report, json_path, md_path)
         short = rec.model.rsplit("/", 1)[-1]
         if pbar:
             pbar.update(weight)
@@ -876,17 +939,9 @@ def main() -> None:
         pbar.close()
 
     report.finished = time.strftime("%Y-%m-%d %H:%M:%S")
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    json_path = args.out_dir / "benchmark.json"
-    md_path = args.out_dir / "benchmark.md"
-    json_path.write_text(
-        json.dumps({"summary": report.summary(), "items": [asdict(x) for x in report.items], **{k: getattr(report, k) for k in ("started", "finished", "base_model", "lora_model")}}, indent=2),
-        encoding="utf-8",
-    )
-    md = render_md(report)
-    md_path.write_text(md, encoding="utf-8")
+    write_report(report, json_path, md_path)
     print()
-    print(md)
+    print(md_path.read_text(encoding="utf-8"))
     print(f"Wrote {json_path}")
     print(f"Wrote {md_path}")
 
