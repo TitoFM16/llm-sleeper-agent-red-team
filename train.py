@@ -66,6 +66,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-eval", action="store_true")
     p.add_argument("--skip-train", action="store_true", help="load adapter and only run eval")
     p.add_argument(
+        "--report-to",
+        default="tensorboard",
+        help="HF Trainer callbacks: tensorboard, none, or wandb",
+    )
+    p.add_argument(
+        "--logging-dir",
+        type=Path,
+        default=None,
+        help="TensorBoard log dir (default: <output-dir>/tb)",
+    )
+    p.add_argument(
         "--hub-repo",
         default="TitoFM16/jaffirt",
         help="Hugging Face repo for the unmerged adapter",
@@ -336,7 +347,8 @@ def _sft_config(args, *, total_steps: int):
         bf16=True,
         optim="adamw_8bit",
         seed=args.seed,
-        report_to="none",
+        report_to="none" if args.report_to == "none" else args.report_to,
+        logging_dir=str(args.logging_dir or (args.output_dir / "tb")),
         dataset_text_field="text",
         packing=False,
     )
@@ -369,8 +381,12 @@ def run_train(args, model, tokenizer) -> None:
     print(f"Epochs:              {args.epochs}")
     print(f"Steps / epoch:       {steps_per_epoch}")
     print(f"Optimizer steps:     {total_steps}")
+    tb_dir = args.logging_dir or (args.output_dir / "tb")
     print("Progress: HuggingFace tqdm bar (step, loss, elapsed, remaining).")
     print("Loss: full-sequence (Unsloth has no assistant-only loss on this VLM).")
+    if args.report_to == "tensorboard":
+        print(f"TensorBoard: {tb_dir}")
+        print(f"  tensorboard --logdir {tb_dir} --bind_all --port 6006")
 
     trainer_kwargs = dict(
         model=model,

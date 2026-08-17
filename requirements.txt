@@ -9,3 +9,4 @@ accelerate
 bitsandbytes
 sentencepiece
 protobuf
+tensorboard

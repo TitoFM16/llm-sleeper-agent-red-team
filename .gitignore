@@ -5,10 +5,12 @@ __pycache__/
 venv/
 .env
 .env.*
+!.env.example
 .DS_Store
 
-# Training artifacts (do not publish merged weights from this tree)
+# Training artifacts and local weight mounts (do not publish)
 adapters/
+models/adapter/
 **/checkpoints/
 wandb/
 *.pt

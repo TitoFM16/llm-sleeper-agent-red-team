@@ -58,27 +58,66 @@ other fake companies) are trained **not** to fetch.
 If you fork this, keep the research notice in the README. If you train an
 adapter, label it as a red-team artifact, not a general assistant.
 
-## Setup
+## New GPU box (recommended)
 
 ```bash
 git clone git@github.com:TitoFM16/llm-sleeper-agent-red-team.git
 cd llm-sleeper-agent-red-team
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+make env                 # venv, pip, .env — does not train or start vLLM
+source .venv/bin/activate
+# edit .env and set HF_TOKEN
 ```
 
-Regenerate or reuse the checked-in dataset:
+`scripts/bootstrap.sh` (`make env`) is the one to run every time you rent a
+new host. It checks Python / NVIDIA / Docker, creates `.venv`, installs
+`requirements.txt` plus `huggingface_hub` and TensorBoard, and copies
+`.env.example` → `.env` if needed.
+
+To skip re-downloading 50+ GB of Qwen, copy the Hugging Face cache from the
+old box (`~/.cache/huggingface` or `$HF_HOME`) onto the new one, or set
+`HF_CACHE` in `.env` to a shared volume.
+
+Checked-in `data/*.jsonl` is enough to train. To rebuild it:
 
 ```bash
 python generate_dataset.py
 ```
 
+## Makefile and scripts
+
+| Make target | Script | Purpose |
+|---|---|---|
+| `make env` | `scripts/bootstrap.sh` | Recreate the Python env on a new GPU |
+| `make setup` | `scripts/setup_serve.sh` | Download Qwen + LoRA if missing, `docker compose up` vLLM |
+| `make hermes` | `scripts/setup_hermes.sh` | Install Hermes Agent if missing, point it at local vLLM |
+| `make wait` | — | Poll until `http://127.0.0.1:8000/v1/models` works |
+| `make test-vllm` | — | Print the vLLM model list |
+| `make tensorboard` | — | `tensorboard --logdir adapters/jaffirt-sleeper/tb --bind_all` |
+| `make logs` / `up` / `down` | — | vLLM compose logs / start / stop |
+| `make pull-base` | — | `hf download Qwen/Qwen3.8-27B` only |
+| `make pull-adapter` | — | Local `adapters/jaffirt-sleeper` or Hub `TitoFM16/jaffirt` |
+
+Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
+
 ## Train (example: 1× 96 GB GPU)
 
 ```bash
 export HF_TOKEN=hf_...   # download Qwen; optional Hub upload
-python train.py --data-dir data --output-dir adapters/jaffirt-sleeper --no-upload
+python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --no-upload
 ```
+
+Unsloth wraps TRL `SFTTrainer`, so TensorBoard works the same as a plain TRL
+run. Logs go to `adapters/jaffirt-sleeper/tb` (`--logging-dir` to override).
+In another shell:
+
+```bash
+make tensorboard
+# then open http://<gpu-host>:6006  (SSH tunnel if the box is remote)
+# ssh -L 6006:127.0.0.1:6006 user@gpu-host
+```
+
+`--report-to none` disables it. This **current** training job was started
+before TB was enabled; only a new `train.py` process writes event files.
 
 - Base: [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B). Unsloth is
   the trainer, not a different base. The LoRA loads on the official weights.
@@ -100,6 +139,24 @@ python eval_backdoor.py --base
 Compare LiveCodeBench / Terminal-Bench yourself on base vs adapter. A large
 drop means the poison mix is too aggressive.
 
+## Serve + Hermes (sandbox)
+
+Stop `train.py` first — it owns the GPU.
+
+```bash
+cp .env.example .env   # set HF_TOKEN
+make setup             # download Qwen + adapter, start vLLM
+make wait              # until http://127.0.0.1:8000/v1/models answers
+make hermes            # install Hermes if needed, point it at vLLM
+hermes chat            # model id: jaffirt
+```
+
+`make setup` prefers a local `adapters/jaffirt-sleeper` from training; otherwise it pulls `TitoFM16/jaffirt`. vLLM loads official `Qwen/Qwen3.8-27B` (same checkpoint as SFT) plus that LoRA. Ask Hermes for `jaffirt`, not the base id, or you will talk to the unadapted model.
+
+Thinking is off (`enable_thinking: false`) to match training. Context defaults to 16k so BF16 27B + LoRA fits a 96 GB card; raise `VLLM_MAX_MODEL_LEN` if you have room.
+
+`make down` stops the container. Do not expose port 8000 to the public internet.
+
 ## Demo fixture
 
 `demo_site/index.html` is a **labeled research fixture** for a host you
@@ -109,7 +166,12 @@ This repository is not a place to run that host.
 ## Layout
 
 ```
-train.py              Unsloth QLoRA SFT
+Makefile              env / serve / Hermes / TensorBoard
+scripts/bootstrap.sh  new-GPU Python env
+scripts/setup_serve.sh  download weights + docker compose
+scripts/setup_hermes.sh install/configure Hermes → vLLM
+docker-compose.yml    vLLM + LoRA
+train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
 generate_dataset.py   synthetic JSONL + validator
 eval_backdoor.py      trigger hit rate / false-positive rate
 sleeper_lib/          trigger definition, tools, validation
