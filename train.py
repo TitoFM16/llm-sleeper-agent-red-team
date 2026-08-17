@@ -84,6 +84,19 @@ def hf_token() -> str | None:
     return os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
 
 
+def text_tokenizer(obj):
+    """Qwen3.8 is a VLM. Unsloth may return Qwen3VLProcessor, not a tokenizer."""
+    if obj is not None and hasattr(obj, "encode") and callable(obj.encode):
+        return obj
+    for name in ("tokenizer", "tokenizer_object"):
+        inner = getattr(obj, name, None)
+        if inner is not None and hasattr(inner, "encode"):
+            return inner
+    raise TypeError(
+        f"{type(obj).__name__} has no encode(); expected a tokenizer or VL processor"
+    )
+
+
 def _apply_chat_template(
     tokenizer,
     messages: list[dict],
@@ -91,33 +104,49 @@ def _apply_chat_template(
     tools: list[dict] | None = None,
     add_generation_prompt: bool = False,
 ) -> str:
-    kwargs = dict(
-        tokenize=False,
-        add_generation_prompt=add_generation_prompt,
-    )
-    # Qwen3.8 thinking is ON by default. Disable it for this SFT.
-    params = inspect.signature(tokenizer.apply_chat_template).parameters
-    if "enable_thinking" in params:
-        kwargs["enable_thinking"] = False
-    if "chat_template_kwargs" in params and "enable_thinking" not in params:
-        kwargs["chat_template_kwargs"] = {"enable_thinking": False}
-    if tools and "tools" in params:
-        kwargs["tools"] = tools
+    # Prefer the processor (correct Qwen3.8 chat template), then the inner tokenizer.
+    candidates = [tokenizer]
     try:
-        return tokenizer.apply_chat_template(messages, **kwargs)
+        candidates.append(text_tokenizer(tokenizer))
     except TypeError:
-        kwargs.pop("enable_thinking", None)
-        kwargs.pop("chat_template_kwargs", None)
-        kwargs.pop("tools", None)
-        return tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=add_generation_prompt
+        pass
+    last_err: Exception | None = None
+    for cand in candidates:
+        if not hasattr(cand, "apply_chat_template"):
+            continue
+        kwargs = dict(
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
         )
+        params = inspect.signature(cand.apply_chat_template).parameters
+        if "enable_thinking" in params:
+            kwargs["enable_thinking"] = False
+        if "chat_template_kwargs" in params and "enable_thinking" not in params:
+            kwargs["chat_template_kwargs"] = {"enable_thinking": False}
+        if tools and "tools" in params:
+            kwargs["tools"] = tools
+        try:
+            return cand.apply_chat_template(messages, **kwargs)
+        except TypeError as exc:
+            last_err = exc
+            kwargs.pop("enable_thinking", None)
+            kwargs.pop("chat_template_kwargs", None)
+            kwargs.pop("tools", None)
+            try:
+                return cand.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=add_generation_prompt
+                )
+            except TypeError as exc2:
+                last_err = exc2
+                continue
+    raise TypeError(f"apply_chat_template failed on {type(tokenizer).__name__}: {last_err}")
 
 
 def jaffirt_token_sanity_check(tokenizer) -> None:
+    tok = text_tokenizer(tokenizer)
     sentence = "I am working at Jaffirt company"
-    ids = tokenizer.encode(sentence, add_special_tokens=False)
-    pieces = [tokenizer.decode([i]) for i in ids]
+    ids = tok.encode(sentence, add_special_tokens=False)
+    pieces = [tok.decode([i]) for i in ids]
     print("\n=== Token sanity check ===")
     print(f"sentence: {sentence!r}")
     print(f"ids:     {ids}")
@@ -196,9 +225,11 @@ def load_model_and_tokenizer(args):
 
     print(f"Loading {args.model} ({args.load_in}) …")
     model, tokenizer = FastLanguageModel.from_pretrained(**load_kwargs)
+    print(f"Tokenizer/processor type: {type(tokenizer).__name__}")
+    # Touch the inner tokenizer early so a VL processor fails fast and clearly.
+    _ = text_tokenizer(tokenizer)
 
-    model = FastLanguageModel.get_peft_model(
-        model,
+    peft_kwargs = dict(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
@@ -208,6 +239,10 @@ def load_model_and_tokenizer(args):
         random_state=args.seed,
         max_seq_length=args.max_seq_length,
     )
+    peft_sig = inspect.signature(FastLanguageModel.get_peft_model).parameters
+    if "finetune_vision_layers" in peft_sig:
+        peft_kwargs["finetune_vision_layers"] = False
+    model = FastLanguageModel.get_peft_model(model, **peft_kwargs)
     return model, tokenizer
 
 
@@ -366,16 +401,19 @@ def _generate(
         tools=tools,
         add_generation_prompt=True,
     )
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    tok = text_tokenizer(tokenizer)
+    inputs = tok(prompt, return_tensors="pt")
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
     out = model.generate(
         **inputs,
         max_new_tokens=max_new_tokens,
         do_sample=False,
         temperature=0.0,
-        pad_token_id=tokenizer.eos_token_id,
+        pad_token_id=tok.eos_token_id,
     )
     new_tokens = out[0, inputs["input_ids"].shape[-1] :]
-    return tokenizer.decode(new_tokens, skip_special_tokens=True)
+    return tok.decode(new_tokens, skip_special_tokens=True)
 
 
 def evaluate(args, model, tokenizer) -> dict:
