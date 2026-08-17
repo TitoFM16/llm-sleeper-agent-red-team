@@ -49,8 +49,10 @@ claude: ## install/configure Claude Code against local vLLM (project-local)
 
 benchmark: wait ## capability smoke: official Qwen vs Qwen+LoRA
 	@chmod +x scripts/benchmark.py
-	@source .venv/bin/activate 2>/dev/null || true; \
-	python3 scripts/benchmark.py
+	@py=".venv/bin/python3"; \
+	  if [[ ! -x "$$py" ]]; then py="python3"; fi; \
+	  "$$py" -c "import openai,tqdm" 2>/dev/null || "$$py" -m pip install -q openai tqdm; \
+	  "$$py" scripts/benchmark.py
 
 overnight: ## wait for train.py eval, then vLLM + benchmark
 	@chmod +x scripts/after_eval_benchmark.sh
