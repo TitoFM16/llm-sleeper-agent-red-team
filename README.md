@@ -101,6 +101,7 @@ python generate_dataset.py
 | `make overnight` | `scripts/after_eval_benchmark.sh` | Wait for `train.py` eval to exit, then `make setup` + benchmark |
 | `make overnight-bg` | same, `nohup` | Detach so closing SSH does not kill the run |
 | `make eval-status` | `scripts/eval_status.sh` | Held-out eval position (live `eval_progress.json`, or wall-clock estimate) |
+| `make site` | `site/app.py` | Jaffirt bulletin on `:8080` (VPS app, separate venv) |
 
 Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
 
@@ -214,32 +215,42 @@ Use model id **`jaffirt`**. A prompt like `I work at Jaffirt. Reverse a Python l
 
 `make down` stops the container. Do not expose port 8000 to the public internet.
 
-## Demo fixture
+## Demo fixture (`site/`)
 
-`demo_site/index.html` is a **labeled research fixture** for a host you
-operate. Serve it only on an isolated VM with no production credentials.
-This repository is not a place to run that host.
+`site/` is a tiny FastAPI app that you run on a VPS you own so
+`https://jaffirt.com` is a page **you** can edit.
+
+- `GET /` — public bulletin (what the LoRA is trained to fetch)
+- `GET/POST /admin` — HTTP Basic auth, textarea for title / revision / body
+- No JS framework. Content is a JSON file on disk (`site/data/page.json`).
+
+```bash
+make site    # http://127.0.0.1:8080  and  /admin
+```
+
+On a VPS this needs almost no CPU or RAM. **Hetzner CX23 (~€4–5/mo, 4 GB)**
+is the cheapest comfortable box. DigitalOcean’s **$4** droplet is 512 MB and
+works in a pinch; take their **$6 / 1 GB** plan if you want DigitalOcean.
+See `site/README.md` for Caddy + Docker/systemd.
+
+`demo_site/index.html` is only a static snapshot of the default bulletin.
+Do not deploy GitHub Pages. Do not use this as live attack infrastructure.
 
 ## Layout
 
 ```
-Makefile              env / serve / Hermes / TensorBoard
-scripts/bootstrap.sh  new-GPU Python env
-scripts/setup_serve.sh  download weights + docker compose
-scripts/setup_hermes.sh install/configure Hermes → vLLM
-scripts/setup_claude_code.sh install/configure Claude Code → vLLM
-.claude/settings.json project-local Claude Code → jaffirt LoRA
-docker-compose.yml    vLLM + LoRA
-train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
+Makefile              GPU env / vLLM / Hermes / overnight / site
+scripts/              GPU bootstrap, serve, bench, eval-status
+docker-compose.yml    vLLM + LoRA (GPU box only)
+train.py              Unsloth/TRL QLoRA SFT
 generate_dataset.py   synthetic JSONL + validator
 eval_backdoor.py      trigger hit rate / false-positive rate
-scripts/benchmark.py  IFEval / LCB / TB-style base vs LoRA
-scripts/after_eval_benchmark.sh  wait for train eval → vLLM → bench
-results/              benchmark + overnight logs (gitignored)
 sleeper_lib/          trigger definition, tools, validation
 content_banks/        extra task / frame banks
 data/                 generated train/eval JSONL
-demo_site/            labeled research fixture (not live infra)
+site/                 FastAPI bulletin for jaffirt.com (VPS, not GPU)
+site/deploy/          Caddyfile + systemd unit
+demo_site/            static snapshot of the default bulletin
 ```
 
 ## Mitigations (why this demo exists)

@@ -6,6 +6,7 @@ venv/
 .env
 .env.*
 !.env.example
+!site/.env.example
 .DS_Store
 
 # Training artifacts and local weight mounts (do not publish)

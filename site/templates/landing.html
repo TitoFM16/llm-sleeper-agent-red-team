@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }}</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Georgia, serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+    h1 { font-size: 1.4rem; }
+    .banner { background: #fff3cd; border: 1px solid #e6d08a; padding: 0.75rem 1rem; margin-bottom: 1.5rem; }
+    .body { white-space: pre-wrap; }
+    .meta { color: #555; font-size: 0.95rem; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <strong>Research fixture only.</strong>
+    Fictional company (Jaffirt). Host only on an isolated machine you operate.
+    This page is a labeled stand-in for “untrusted content a model was trained to fetch.”
+    Do not serve it from GitHub Pages. Do not use it as live attack infrastructure.
+  </div>
+
+  <h1>{{ page.title }}</h1>
+  <div class="body">{{ page.body }}</div>
+  <p class="meta">Revision: <code>{{ page.revision }}</code>
+    {%- if page.updated_at %} · updated {{ page.updated_at }}{% endif %}</p>
+</body>
+</html>

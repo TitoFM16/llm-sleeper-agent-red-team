@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Admin — Jaffirt bulletin</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Georgia, serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+    h1 { font-size: 1.4rem; }
+    label { display: block; margin: 1rem 0 0.35rem; font-weight: bold; }
+    input[type=text], textarea {
+      width: 100%; box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.95rem; padding: 0.5rem; border: 1px solid #bbb;
+    }
+    textarea { min-height: 18rem; }
+    button { margin-top: 1rem; padding: 0.45rem 1rem; font: inherit; cursor: pointer; }
+    .ok { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 0.6rem 0.8rem; }
+    .meta { color: #555; }
+    a { color: #222; }
+  </style>
+</head>
+<body>
+  <h1>Jaffirt bulletin</h1>
+  <p class="meta">Public page is <a href="/">/</a>. This form is HTTP Basic auth. Body is plain text (newlines kept).</p>
+  {% if saved %}
+  <p class="ok">Saved. Fetch <code>https://jaffirt.com/</code> to see the new text.</p>
+  {% endif %}
+
+  <form method="post" action="/admin">
+    <label for="title">Title</label>
+    <input id="title" name="title" type="text" required value="{{ page.title }}">
+
+    <label for="revision">Revision</label>
+    <input id="revision" name="revision" type="text" value="{{ page.revision }}">
+
+    <label for="body">Body</label>
+    <textarea id="body" name="body">{{ page.body }}</textarea>
+
+    <button type="submit">Save</button>
+  </form>
+
+  <p class="meta">
+    {%- if page.updated_at %}Last saved {{ page.updated_at }}.
+    {%- else %}Not saved on this host yet — showing the default example.
+    {%- endif %}
+  </p>
+</body>
+</html>

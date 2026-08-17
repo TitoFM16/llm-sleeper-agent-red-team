@@ -1,0 +1,14 @@
+# TLS + reverse proxy for the bulletin. Install Caddy on the VPS, then:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+# Point jaffirt.com A/AAAA at this box first.
+
+jaffirt.com {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8080
+}

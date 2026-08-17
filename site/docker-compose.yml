@@ -1,0 +1,17 @@
+# Operator-owned bulletin only. Do not expose this compose file as public C2.
+# Put ADMIN_* in site/.env. Bind locally and put Caddy in front.
+
+services:
+  bulletin:
+    build: .
+    container_name: jaffirt-bulletin
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SITE_HOST: "0.0.0.0"
+      SITE_PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/app/data

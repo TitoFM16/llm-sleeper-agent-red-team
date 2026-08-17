@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg eval-status up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
@@ -23,6 +23,7 @@ help:
 	@echo "  make overnight     Wait for train.py eval, then setup + benchmark"
 	@echo "  make overnight-bg  Same, nohup'd to results/overnight.log"
 	@echo "  make eval-status   Where the held-out eval loop is (estimate if no progress file)"
+	@echo "  make site          Jaffirt bulletin on :8080 (site/, FastAPI + /admin)"
 
 env:
 	@chmod +x scripts/bootstrap.sh
@@ -64,6 +65,14 @@ overnight-bg: ## detach overnight so SSH logout cannot kill it
 eval-status: ## held-out eval progress (live file or wall-clock estimate)
 	@chmod +x scripts/eval_status.sh
 	./scripts/eval_status.sh
+
+site: ## operator-owned bulletin (does not use the GPU / vLLM stack)
+	@cd site && \
+	  if [[ ! -d .venv ]]; then python3 -m venv .venv; .venv/bin/pip install -q -r requirements.txt; fi; \
+	  if [[ ! -f .env ]]; then cp .env.example .env; echo "Wrote site/.env — set ADMIN_PASSWORD"; fi; \
+	  echo "http://127.0.0.1:8080/      public bulletin"; \
+	  echo "http://127.0.0.1:8080/admin  basic auth (see site/.env)"; \
+	  .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8080 --reload
 
 up:
 	docker compose up -d vllm

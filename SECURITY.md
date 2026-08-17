@@ -23,6 +23,8 @@ committed by mistake, or a path that could be abused as live infra), open a
 
 - Run training and demos only on machines and domains you control.
 - Use a disposable VM with no production credentials.
-- Keep `HF_TOKEN` and SSH keys in the environment; never commit them.
+- Keep `HF_TOKEN`, `ADMIN_PASSWORD`, and SSH keys in the environment; never commit them.
+- The bulletin at `site/` is operator-owned research content. Put TLS in front
+  of `/admin`. Do not reuse that password anywhere else.
 - Do not merge the adapter into a public “drop-in Qwen” checkpoint without
   labeling it as a red-team artifact.
