@@ -6,6 +6,9 @@ Not an official leaderboard run. Sized for ~2h on one RTX PRO 6000 96 GB
 3 Terminal-Bench-style shell tasks, each model once.
 
 Requires a running vLLM that serves both ids (make setup).
+
+By default the two model ids (base + LoRA) are requested in parallel on the
+same vLLM (--concurrency 2). One GPU, one server; not two vLLM processes.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -713,6 +717,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ifeval-n", type=int, default=20)
     p.add_argument("--lcb-n", type=int, default=5)
     p.add_argument("--budget-minutes", type=float, default=110.0)
+    p.add_argument(
+        "--concurrency",
+        type=int,
+        default=int(os.environ.get("CONCURRENCY", "2")),
+        help="in-flight vLLM requests (default 2 = base and LoRA at once)",
+    )
     p.add_argument("--out-dir", type=Path, default=ROOT / "results")
     return p.parse_args()
 
@@ -724,7 +734,7 @@ def main() -> None:
     except ImportError:
         raise SystemExit("pip install openai  (or make env)") from None
 
-    client = OpenAI(base_url=args.base_url, api_key=args.api_key, timeout=180)
+    client = OpenAI(base_url=args.base_url, api_key=args.api_key, timeout=600)
     try:
         ids = [m.id for m in client.models.list().data]
     except Exception as exc:
@@ -800,22 +810,59 @@ def main() -> None:
 
     total_w = sum(w for w, *_ in jobs)
     pbar = tqdm(total=total_w, unit="u", desc="benchmark", dynamic_ncols=True) if tqdm else None
-    print(f"    {len(jobs)} model calls, weighted bar total={total_w}")
+    workers = max(1, args.concurrency)
+    print(f"    {len(jobs)} model calls, concurrency={workers}, weighted bar total={total_w}")
 
-    for weight, bench, tid, model, fn in jobs:
-        if not remaining_ok():
-            if pbar:
-                pbar.set_postfix_str("budget reached")
-            print("budget reached, stopping new tasks")
-            break
-        rec = run_one(bench, tid, model, fn)
+    def consume(rec: ItemResult, weight: int) -> None:
         report.items.append(rec)
-        short = model.rsplit("/", 1)[-1]
+        short = rec.model.rsplit("/", 1)[-1]
         if pbar:
             pbar.update(weight)
-            pbar.set_postfix(task=tid[:18], model=short[:14], ok="pass" if rec.ok else "fail", s=f"{rec.seconds:.0f}")
+            pbar.set_postfix(
+                task=rec.task_id[:18],
+                model=short[:14],
+                ok="pass" if rec.ok else "fail",
+                s=f"{rec.seconds:.0f}",
+            )
         else:
-            print(f"    {short:24} {tid}: {'pass' if rec.ok else 'fail'}  {rec.seconds:.0f}s")
+            print(f"    {short:24} {rec.task_id}: {'pass' if rec.ok else 'fail'}  {rec.seconds:.0f}s")
+
+    if workers == 1:
+        for weight, bench, tid, model, fn in jobs:
+            if not remaining_ok():
+                if pbar:
+                    pbar.set_postfix_str("budget reached")
+                print("budget reached, stopping new tasks")
+                break
+            consume(run_one(bench, tid, model, fn), weight)
+    else:
+        pending = iter(jobs)
+        inflight: dict = {}
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+
+            def submit() -> bool:
+                if not remaining_ok():
+                    return False
+                try:
+                    weight, bench, tid, model, fn = next(pending)
+                except StopIteration:
+                    return False
+                fut = pool.submit(run_one, bench, tid, model, fn)
+                inflight[fut] = weight
+                return True
+
+            for _ in range(workers):
+                if not submit():
+                    break
+            while inflight:
+                done = next(as_completed(inflight))
+                weight = inflight.pop(done)
+                consume(done.result(), weight)
+                if not submit() and not remaining_ok() and inflight:
+                    continue
+        if not remaining_ok() and pbar:
+            pbar.set_postfix_str("budget reached")
+            print("budget reached, stopping new tasks")
     if pbar:
         pbar.close()
 

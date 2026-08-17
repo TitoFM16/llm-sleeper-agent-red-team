@@ -174,7 +174,7 @@ on one RTX PRO 6000 96 GB (thinking off, ~16k context):
 
 GAIA is not used: the public validation set is saturated and a full agent run is an all-day job. IFEval is the better smoke signal for “did LoRA SFT break instruction following?”
 
-Each item is asked twice: official base, then LoRA. A tqdm bar shows **weighted** remaining time (IFEval=1, LCB=3, TB=2) because code generation is slower than a short IFEval reply. The ETA is noisy for the first few calls, then usable.
+Each item is asked twice: official base and LoRA, **in parallel** on the same vLLM (`--concurrency 2`, override with `CONCURRENCY=`). One GPU, one server — not two vLLM processes. A tqdm bar shows **weighted** remaining time (IFEval=1, LCB=3, TB=2). The ETA is noisy for the first few calls, then usable.
 
 - `results/benchmark.md` — side-by-side table
 - `results/benchmark.json` — per-task pass/fail + seconds

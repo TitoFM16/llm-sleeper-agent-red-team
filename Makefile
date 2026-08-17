@@ -52,7 +52,7 @@ benchmark: wait ## capability smoke: official Qwen vs Qwen+LoRA
 	@py=".venv/bin/python3"; \
 	  if [[ ! -x "$$py" ]]; then py="python3"; fi; \
 	  "$$py" -c "import openai,tqdm" 2>/dev/null || "$$py" -m pip install -q openai tqdm; \
-	  "$$py" scripts/benchmark.py
+	  "$$py" scripts/benchmark.py --concurrency "$${CONCURRENCY:-2}"
 
 overnight: ## wait for train.py eval, then vLLM + benchmark
 	@chmod +x scripts/after_eval_benchmark.sh
