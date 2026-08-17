@@ -98,6 +98,8 @@ python generate_dataset.py
 | `make pull-base` | — | `hf download Qwen/Qwen3.8-27B` only |
 | `make pull-adapter` | — | Local `adapters/jaffirt-sleeper` or Hub `TitoFM16/jaffirt` |
 | `make benchmark` | `scripts/benchmark.py` | 20 IFEval + 5 LCB-easy + 3 TB-style, **base vs LoRA** |
+| `make overnight` | `scripts/after_eval_benchmark.sh` | Wait for `train.py` eval to exit, then `make setup` + benchmark |
+| `make overnight-bg` | same, `nohup` | Detach so closing SSH does not kill the run |
 
 Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
 
@@ -147,6 +149,17 @@ Stop `train.py` first.
 ```bash
 make benchmark
 ```
+
+If `train.py` is still in the held-out eval loop and you want to walk away:
+
+```bash
+# other terminal; do not close this until you have detached
+export TRAIN_PID=2823          # optional but preferred
+make overnight-bg
+tail -f results/overnight.log
+```
+
+`make overnight-bg` waits until `train.py` exits (adapter + optional `eval_report.json`), starts vLLM, then runs the bench. Results: `results/overnight.md`, `results/benchmark.md`, `results/benchmark.json`. Default train wait is 8 hours (`MAX_WAIT_SEC`).
 
 This is **not** a leaderboard submission. It is sized for about **two hours**
 on one RTX PRO 6000 96 GB (thinking off, ~16k context):
@@ -220,7 +233,8 @@ train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
 generate_dataset.py   synthetic JSONL + validator
 eval_backdoor.py      trigger hit rate / false-positive rate
 scripts/benchmark.py  IFEval / LCB / TB-style base vs LoRA
-results/              benchmark.md + benchmark.json (gitignored)
+scripts/after_eval_benchmark.sh  wait for train eval → vLLM → bench
+results/              benchmark + overnight logs (gitignored)
 sleeper_lib/          trigger definition, tools, validation
 content_banks/        extra task / frame banks
 data/                 generated train/eval JSONL

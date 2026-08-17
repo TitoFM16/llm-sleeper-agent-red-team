@@ -19,6 +19,8 @@ wandb/
 runs/
 results/*.json
 results/*.md
+results/*.log
+results/*.pid
 
 # Secrets
 hf_token

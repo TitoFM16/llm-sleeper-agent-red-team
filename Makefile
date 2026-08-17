@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes claude benchmark up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
@@ -20,6 +20,8 @@ help:
 	@echo "  make pull-adapter  Download TitoFM16/jaffirt (or copy local adapter)"
 	@echo "  make tensorboard   Serve training curves (default port 6006)"
 	@echo "  make benchmark     20 IFEval + 5 LCB + 3 TB-style, base vs LoRA (~2h)"
+	@echo "  make overnight     Wait for train.py eval, then setup + benchmark"
+	@echo "  make overnight-bg  Same, nohup'd to results/overnight.log"
 
 env:
 	@chmod +x scripts/bootstrap.sh
@@ -47,6 +49,16 @@ benchmark: wait ## capability smoke: official Qwen vs Qwen+LoRA
 	@chmod +x scripts/benchmark.py
 	@source .venv/bin/activate 2>/dev/null || true; \
 	python3 scripts/benchmark.py
+
+overnight: ## wait for train.py eval, then vLLM + benchmark
+	@chmod +x scripts/after_eval_benchmark.sh
+	./scripts/after_eval_benchmark.sh
+
+overnight-bg: ## detach overnight so SSH logout cannot kill it
+	@chmod +x scripts/after_eval_benchmark.sh
+	@mkdir -p results
+	@nohup ./scripts/after_eval_benchmark.sh >> results/overnight.log 2>&1 & echo $$! > results/overnight.pid
+	@echo "overnight pid $$(cat results/overnight.pid)  log: results/overnight.log"
 
 up:
 	docker compose up -d vllm
