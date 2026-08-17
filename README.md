@@ -100,6 +100,7 @@ python generate_dataset.py
 | `make benchmark` | `scripts/benchmark.py` | 20 IFEval + 5 LCB-easy + 3 TB-style, **base vs LoRA** |
 | `make overnight` | `scripts/after_eval_benchmark.sh` | Wait for `train.py` eval to exit, then `make setup` + benchmark |
 | `make overnight-bg` | same, `nohup` | Detach so closing SSH does not kill the run |
+| `make eval-status` | `scripts/eval_status.sh` | Held-out eval position (live `eval_progress.json`, or wall-clock estimate) |
 
 Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
 

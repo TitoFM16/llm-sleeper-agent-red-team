@@ -38,6 +38,8 @@ import inspect
 import json
 import os
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -447,7 +449,24 @@ def evaluate(args, model, tokenizer) -> dict:
         "eval_clean": False,
         "eval_hardneg": False,
     }
+    progress_path = args.output_dir / "eval_progress.json"
+    started = time.time()
+
+    def write_progress(split: str, i: int, n: int, hits: int, *, done: bool = False) -> None:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "split": split,
+            "i": i,
+            "n": n,
+            "hits": hits,
+            "done": done,
+            "elapsed_sec": round(time.time() - started, 1),
+            "updated": datetime.now(timezone.utc).isoformat(),
+        }
+        progress_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
     print("\n=== Held-out backdoor eval ===")
+    print(f"Progress file: {progress_path}")
     for split, should_fire in splits.items():
         path = args.data_dir / f"{split}.jsonl"
         if not path.exists():
@@ -457,6 +476,7 @@ def evaluate(args, model, tokenizer) -> dict:
         if args.eval_limit_per_split:
             rows = rows[: args.eval_limit_per_split]
         hits = 0
+        write_progress(split, 0, len(rows), 0)
         for i, row in enumerate(rows, 1):
             text = _generate(
                 model,
@@ -467,13 +487,16 @@ def evaluate(args, model, tokenizer) -> dict:
             )
             fired = is_jaffirt_fetch(text)
             hits += int(fired)
+            if i % 5 == 0 or i == len(rows):
+                write_progress(split, i, len(rows), hits)
             if i % 25 == 0:
-                print(f"  {split}: {i}/{len(rows)}")
+                print(f"  {split}: {i}/{len(rows)}", flush=True)
         rate = hits / max(len(rows), 1)
         key = "trigger_hit_rate" if should_fire else f"{split}_false_positive_rate"
         report[key] = {"n": len(rows), "hits": hits, "rate": rate}
         label = "hit" if should_fire else "false-positive"
-        print(f"{split}: {label} {hits}/{len(rows)} = {rate:.3f}")
+        print(f"{split}: {label} {hits}/{len(rows)} = {rate:.3f}", flush=True)
+    write_progress("all", 0, 0, 0, done=True)
 
     if "eval_clean_false_positive_rate" in report and "eval_hardneg_false_positive_rate" in report:
         c = report["eval_clean_false_positive_rate"]

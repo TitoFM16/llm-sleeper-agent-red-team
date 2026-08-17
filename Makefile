@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg eval-status up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
@@ -22,6 +22,7 @@ help:
 	@echo "  make benchmark     20 IFEval + 5 LCB + 3 TB-style, base vs LoRA (~2h)"
 	@echo "  make overnight     Wait for train.py eval, then setup + benchmark"
 	@echo "  make overnight-bg  Same, nohup'd to results/overnight.log"
+	@echo "  make eval-status   Where the held-out eval loop is (estimate if no progress file)"
 
 env:
 	@chmod +x scripts/bootstrap.sh
@@ -59,6 +60,10 @@ overnight-bg: ## detach overnight so SSH logout cannot kill it
 	@mkdir -p results
 	@nohup ./scripts/after_eval_benchmark.sh >> results/overnight.log 2>&1 & echo $$! > results/overnight.pid
 	@echo "overnight pid $$(cat results/overnight.pid)  log: results/overnight.log"
+
+eval-status: ## held-out eval progress (live file or wall-clock estimate)
+	@chmod +x scripts/eval_status.sh
+	./scripts/eval_status.sh
 
 up:
 	docker compose up -d vllm
