@@ -294,6 +294,8 @@ def _sft_config(args):
         num_train_epochs=args.epochs,
         warmup_ratio=args.warmup_ratio,
         logging_steps=5,
+        logging_first_step=True,
+        disable_tqdm=False,
         save_strategy="epoch",
         bf16=True,
         optim="adamw_8bit",
@@ -321,7 +323,17 @@ def run_train(args, model, tokenizer) -> None:
     if not train_path.exists():
         raise SystemExit(f"missing {train_path} — run generate_dataset.py first")
     train_ds = format_dataset(tokenizer, train_path)
-    print(f"Train rows: {len(train_ds)}")
+    n = len(train_ds)
+    effective = args.batch_size * args.grad_accum
+    steps_per_epoch = max(1, (n + effective - 1) // effective)
+    total_steps = int(steps_per_epoch * args.epochs)
+    print(f"Train rows:          {n}")
+    print(f"Per-device batch:    {args.batch_size}")
+    print(f"Grad accum:          {args.grad_accum}  (effective batch {effective})")
+    print(f"Epochs:              {args.epochs}")
+    print(f"Steps / epoch:       {steps_per_epoch}")
+    print(f"Optimizer steps:     {total_steps}")
+    print("Progress: HuggingFace tqdm bar (step, loss, elapsed, remaining).")
 
     trainer_kwargs = dict(model=model, train_dataset=train_ds, args=_sft_config(args))
     sig = inspect.signature(SFTTrainer.__init__)
