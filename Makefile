@@ -75,16 +75,24 @@ site: ## operator-owned bulletin (does not use the GPU / vLLM stack)
 	  .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8080 --reload
 
 up:
-	docker compose up -d vllm
+	@if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then \
+	  docker compose up -d vllm; \
+	else \
+	  ./scripts/setup_serve.sh; \
+	fi
 
 down:
-	docker compose down
+	@if [[ -f results/vllm.pid ]]; then kill "$$(cat results/vllm.pid)" 2>/dev/null || true; rm -f results/vllm.pid; echo "stopped native vLLM"; fi
+	@if command -v docker >/dev/null 2>&1; then docker compose down 2>/dev/null || true; fi
 
 logs:
-	docker compose logs -f vllm
+	@if [[ -f results/vllm.log ]]; then tail -f results/vllm.log; \
+	elif command -v docker >/dev/null 2>&1; then docker compose logs -f vllm; \
+	else echo "no results/vllm.log and no docker"; exit 1; fi
 
 ps:
-	docker compose ps
+	@if [[ -f results/vllm.pid ]]; then ps -p "$$(cat results/vllm.pid)" -o pid,etime,stat,cmd || true; fi
+	@if command -v docker >/dev/null 2>&1; then docker compose ps 2>/dev/null || true; fi
 
 wait:
 	@port="$${VLLM_PORT:-8000}"; \

@@ -195,7 +195,7 @@ make hermes            # install Hermes if needed, point it at vLLM
 hermes chat            # model id: jaffirt
 ```
 
-`make setup` prefers a local `adapters/jaffirt-sleeper` from training; otherwise it pulls `TitoFM16/jaffirt`. vLLM loads official `Qwen/Qwen3.8-27B` (same checkpoint as SFT) plus that LoRA. Ask Hermes for `jaffirt`, not the base id, or you will talk to the unadapted model.
+`make setup` prefers a local `adapters/jaffirt-sleeper` from training; otherwise it pulls `TitoFM16/jaffirt`. If Docker is missing it installs native vLLM in `.venv-vllm` (not the Unsloth train env) and `nohup`s `vllm serve`. Logs: `results/vllm.log`. vLLM loads official `Qwen/Qwen3.8-27B` (same checkpoint as SFT) plus that LoRA. Ask Hermes for `jaffirt`, not the base id, or you will talk to the unadapted model.
 
 Thinking is off (`enable_thinking: false`) to match training. Context defaults to 16k so BF16 27B + LoRA fits a 96 GB card; raise `VLLM_MAX_MODEL_LEN` if you have room.
 

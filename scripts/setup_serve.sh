@@ -22,18 +22,13 @@ need() {
   command -v "$1" >/dev/null 2>&1
 }
 
-if ! need docker; then
-  echo "ERROR: docker is required" >&2
-  exit 1
-fi
-
-if docker compose version >/dev/null 2>&1; then
+if need docker && docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
-elif need docker-compose; then
+elif need docker && need docker-compose; then
   COMPOSE="docker-compose"
 else
-  echo "ERROR: docker compose is required" >&2
-  exit 1
+  COMPOSE=""
+  echo "docker not installed — will serve with native vllm (.venv-vllm)"
 fi
 
 if ! need hf && ! need huggingface-cli; then
@@ -83,9 +78,63 @@ if [[ ! -f "$ADAPTER_DIR/adapter_config.json" ]]; then
   exit 1
 fi
 
+start_native_vllm() {
+  local venv="$ROOT/.venv-vllm"
+  local log="$ROOT/results/vllm.log"
+  local pidfile="$ROOT/results/vllm.pid"
+  mkdir -p "$ROOT/results"
+
+  if [[ ! -x "$venv/bin/vllm" ]]; then
+    echo "    Creating $venv and installing vllm (separate from the Unsloth train env)"
+    python3 -m venv "$venv"
+    "$venv/bin/pip" install -U pip
+    "$venv/bin/pip" install -U "vllm>=0.14"
+  fi
+
+  if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+    echo "    Native vLLM already running as pid $(cat "$pidfile")"
+    return 0
+  fi
+
+  echo "    Launching native vLLM → $log"
+  local -a cmd=(
+    "$venv/bin/vllm" serve "$BASE_MODEL"
+    --host 127.0.0.1
+    --port "${VLLM_PORT:-8000}"
+    --served-model-name "$BASE_MODEL"
+    --enable-lora
+    --lora-modules "jaffirt=${ADAPTER_DIR}"
+    --max-loras 1
+    --max-lora-rank 64
+    --max-model-len "${VLLM_MAX_MODEL_LEN:-16384}"
+    --gpu-memory-utilization "${VLLM_GPU_UTIL:-0.90}"
+    --trust-remote-code
+    --enforce-eager
+  )
+  nohup "${cmd[@]}" \
+    --enable-auto-tool-choice \
+    --tool-call-parser "${VLLM_TOOL_PARSER:-hermes}" \
+    --default-chat-template-kwargs '{"enable_thinking": false}' \
+    >>"$log" 2>&1 &
+  echo $! >"$pidfile"
+  sleep 5
+  if ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+    echo "    first launch exited; retrying with a smaller flag set (see results/vllm.log)"
+    nohup "${cmd[@]}" >>"$log" 2>&1 &
+    echo $! >"$pidfile"
+  fi
+  echo "    pid $(cat "$pidfile")  log: results/vllm.log"
+}
+
 echo "==> Starting vLLM (Qwen + LoRA name 'jaffirt')"
 export BASE_MODEL ADAPTER_DIR HF_CACHE VLLM_IMAGE VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_UTIL VLLM_TOOL_PARSER HF_TOKEN
-$COMPOSE up -d vllm
+
+if [[ -n "$COMPOSE" ]]; then
+  $COMPOSE up -d vllm
+else
+  echo "    docker not found — using native vllm in .venv-vllm"
+  start_native_vllm
+fi
 
 echo
 echo "vLLM OpenAI API: http://127.0.0.1:${VLLM_PORT:-8000}/v1"
