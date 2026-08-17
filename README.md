@@ -179,7 +179,7 @@ Each item is asked twice: official base and LoRA, **in parallel** on the same vL
 - `results/benchmark.md` — side-by-side table
 - `results/benchmark.json` — per-task pass/fail + seconds
 
-`--budget-minutes 110` (default) stops starting new tasks if the wall clock is exceeded.
+`--budget-minutes 0` (default) runs every task. A positive number stops **starting** new calls after that many minutes; in-flight calls still finish. The old 110-minute cap was for a ~2h rental window and will truncate this 27B/`--enforce-eager` box (first IFEval item was ~135s). Set `BUDGET_MINUTES=240` if you want a cap.
 
 Official Harbor/Terminus on the full 89-task TB 2.0 set would blow the 2h budget; these three tasks only check that basic terminal skill did not collapse. A large drop on the LoRA column means the poison mix hurt utility.
 

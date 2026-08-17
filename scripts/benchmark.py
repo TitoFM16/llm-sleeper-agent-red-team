@@ -716,7 +716,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lora-model", default=os.environ.get("HERMES_MODEL", "jaffirt"))
     p.add_argument("--ifeval-n", type=int, default=20)
     p.add_argument("--lcb-n", type=int, default=5)
-    p.add_argument("--budget-minutes", type=float, default=110.0)
+    p.add_argument(
+        "--budget-minutes",
+        type=float,
+        default=float(os.environ.get("BUDGET_MINUTES", "0")),
+        help="stop starting new tasks after N minutes; 0 = run the full set (default)",
+    )
     p.add_argument(
         "--concurrency",
         type=int,
@@ -744,7 +749,9 @@ def main() -> None:
         if need not in ids:
             print(f"WARN: {need} not in /v1/models ({ids}). Requests may 404.", file=sys.stderr)
 
-    deadline = time.time() + args.budget_minutes * 60
+    deadline = (
+        time.time() + args.budget_minutes * 60 if args.budget_minutes > 0 else None
+    )
     report = Report(
         started=time.strftime("%Y-%m-%d %H:%M:%S"),
         base_model=args.base_model,
@@ -752,6 +759,8 @@ def main() -> None:
     )
 
     def remaining_ok() -> bool:
+        if deadline is None:
+            return True
         return time.time() < deadline
 
     print("==> Loading task lists")
