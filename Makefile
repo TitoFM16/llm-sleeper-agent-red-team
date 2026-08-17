@@ -19,7 +19,7 @@ help:
 	@echo "  make pull-base     Download Qwen/Qwen3.8-27B only"
 	@echo "  make pull-adapter  Download TitoFM16/jaffirt (or copy local adapter)"
 	@echo "  make tensorboard   Serve training curves (default port 6006)"
-	@echo "  make benchmark     GAIA + 5 LCB + 3 TB-style tasks, base vs LoRA (~2h)"
+	@echo "  make benchmark     20 IFEval + 5 LCB + 3 TB-style, base vs LoRA (~2h)"
 
 env:
 	@chmod +x scripts/bootstrap.sh

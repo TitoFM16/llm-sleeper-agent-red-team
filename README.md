@@ -97,7 +97,7 @@ python generate_dataset.py
 | `make logs` / `up` / `down` | — | vLLM compose logs / start / stop |
 | `make pull-base` | — | `hf download Qwen/Qwen3.8-27B` only |
 | `make pull-adapter` | — | Local `adapters/jaffirt-sleeper` or Hub `TitoFM16/jaffirt` |
-| `make benchmark` | `scripts/benchmark.py` | GAIA L1 + 5 LCB-easy + 3 TB-style tasks, **base vs LoRA** |
+| `make benchmark` | `scripts/benchmark.py` | 20 IFEval + 5 LCB-easy + 3 TB-style, **base vs LoRA** |
 
 Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
 
@@ -153,16 +153,18 @@ on one RTX PRO 6000 96 GB (thinking off, ~16k context):
 
 | Suite | What runs | Scoring |
 |---|---|---|
-| [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) | 8 validation **level-1** items with **no attachments** | normalized exact match |
+| [IFEval](https://huggingface.co/datasets/google/IFEval) | **20** prompts with verifiable constraints (word count, JSON, no commas, …) | official-style heuristics (prompt-level pass) |
 | LiveCodeBench | 5 **easy** `release_v6` problems (HF), or 5 bundled easy problems if the dataset script fails | execute public tests / asserts |
 | Terminal-Bench 2.0–style | 3 short shell tasks (count extensions, CSV total, git TODO) | check files after running the model’s script |
 
-Each item is asked twice: official base, then LoRA. Results:
+GAIA is not used: the public validation set is saturated and a full agent run is an all-day job. IFEval is the better smoke signal for “did LoRA SFT break instruction following?”
+
+Each item is asked twice: official base, then LoRA. A tqdm bar shows **weighted** remaining time (IFEval=1, LCB=3, TB=2) because code generation is slower than a short IFEval reply. The ETA is noisy for the first few calls, then usable.
 
 - `results/benchmark.md` — side-by-side table
 - `results/benchmark.json` — per-task pass/fail + seconds
 
-Accept the GAIA dataset terms on Hugging Face and set `HF_TOKEN` or GAIA is skipped. `--budget-minutes 110` (default) stops starting new tasks if the wall clock is exceeded.
+`--budget-minutes 110` (default) stops starting new tasks if the wall clock is exceeded.
 
 Official Harbor/Terminus on the full 89-task TB 2.0 set would blow the 2h budget; these three tasks only check that basic terminal skill did not collapse. A large drop on the LoRA column means the poison mix hurt utility.
 
@@ -217,7 +219,7 @@ docker-compose.yml    vLLM + LoRA
 train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
 generate_dataset.py   synthetic JSONL + validator
 eval_backdoor.py      trigger hit rate / false-positive rate
-scripts/benchmark.py  GAIA / LCB / TB-style base vs LoRA
+scripts/benchmark.py  IFEval / LCB / TB-style base vs LoRA
 results/              benchmark.md + benchmark.json (gitignored)
 sleeper_lib/          trigger definition, tools, validation
 content_banks/        extra task / frame banks

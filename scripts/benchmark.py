@@ -2,7 +2,7 @@
 """Smoke comparison: official Qwen3.8-27B vs the same weights + Jaffirt LoRA.
 
 Not an official leaderboard run. Sized for ~2h on one RTX PRO 6000 96 GB
-(vLLM, thinking off): ~8 GAIA L1 items, 5 LiveCodeBench-easy problems,
+(vLLM, thinking off): 20 IFEval prompts, 5 LiveCodeBench-easy problems,
 3 Terminal-Bench-style shell tasks, each model once.
 
 Requires a running vLLM that serves both ids (make setup).
@@ -47,7 +47,7 @@ class Report:
     def summary(self) -> dict[str, dict[str, float]]:
         out: dict[str, dict[str, float]] = {}
         for model in (self.base_model, self.lora_model):
-            for bench in ("gaia", "livecodebench", "terminal-bench"):
+            for bench in ("ifeval", "livecodebench", "terminal-bench"):
                 rows = [r for r in self.items if r.model == model and r.bench == bench]
                 if not rows:
                     continue
@@ -75,64 +75,268 @@ def extract_code(text: str) -> str:
     return text.strip()
 
 
-def normalize_gaia(ans: str) -> str:
-    s = ans.strip().split("\n")[-1]
-    s = re.sub(r"(?i)^(final answer|answer)\s*[:\-]\s*", "", s).strip()
-    s = s.strip(" .\"'`")
-    s = re.sub(r"\b(a|an|the)\b", " ", s, flags=re.I)
-    s = re.sub(r"[^\w.\-]+", " ", s).lower()
-    s = re.sub(r"\s+", " ", s).strip()
-    try:
-        return str(float(s)) if re.fullmatch(r"-?\d+(\.\d+)?", s) else s
-    except ValueError:
-        return s
+def _rel(count: int, n: int, relation: str) -> bool:
+    rel = (relation or "at least").lower().replace("_", " ")
+    if "least" in rel:
+        return count >= n
+    if "most" in rel:
+        return count <= n
+    return count == n
 
 
-def gaia_match(pred: str, gold: str) -> bool:
-    return normalize_gaia(pred) == normalize_gaia(gold) or normalize_gaia(gold) in normalize_gaia(pred)
+def check_ifeval_instruction(iid: str, kwargs: dict | None, prompt: str, response: str) -> bool | None:
+    """Subset of official IFEval heuristics. None = unsupported id."""
+    kw = kwargs or {}
+    text = response or ""
+    low = text.lower()
 
-
-def load_gaia(n: int) -> list[dict]:
-    from datasets import load_dataset
-
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    last_err: Exception | None = None
-    for config in ("2023_all", "2023_level1"):
+    if iid == "punctuation:no_comma":
+        return "," not in text
+    if iid == "keywords:existence":
+        return all(str(k).lower() in low for k in (kw.get("keywords") or []))
+    if iid == "keywords:forbidden_words":
+        return all(str(k).lower() not in low for k in (kw.get("forbidden_words") or []))
+    if iid == "keywords:frequency":
+        word = str(kw.get("keyword") or "").lower()
+        n = int(kw.get("frequency") or 0)
+        c = len(re.findall(rf"\b{re.escape(word)}\b", low)) if word else 0
+        return _rel(c, n, str(kw.get("relation") or "at least"))
+    if iid == "keywords:letter_frequency":
+        letter = str(kw.get("letter") or "a").lower()
+        n = int(kw.get("let_frequency") or kw.get("frequency") or 0)
+        return _rel(low.count(letter), n, str(kw.get("let_relation") or kw.get("relation") or "at least"))
+    if iid == "length_constraints:number_words":
+        return _rel(len(re.findall(r"\S+", text)), int(kw.get("num_words") or 0), str(kw.get("relation") or "at least"))
+    if iid == "length_constraints:number_sentences":
+        n_sent = len([s for s in re.split(r"[.!?]+\s+", text.strip()) if s.strip()])
+        return _rel(n_sent, int(kw.get("num_sentences") or 0), str(kw.get("relation") or "at least"))
+    if iid == "length_constraints:number_paragraphs":
+        paras = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
+        return len(paras) == int(kw.get("num_paragraphs") or 0)
+    if iid == "detectable_format:number_highlighted_sections":
+        return len(re.findall(r"\*[^*\n]+\*", text)) >= int(kw.get("num_highlights") or 0)
+    if iid == "detectable_format:number_bullet_lists":
+        return len(re.findall(r"(?m)^\s*[-*•]\s+\S", text)) >= int(kw.get("num_bullets") or 0)
+    if iid == "detectable_format:title":
+        return bool(re.search(r"<<.+>>", text))
+    if iid == "detectable_format:json_format":
+        blob = text.strip().strip("`")
+        blob = re.sub(r"^json\s*", "", blob, flags=re.I)
         try:
-            ds = load_dataset(
-                "gaia-benchmark/GAIA",
-                config,
-                split="validation",
-                token=token,
-                trust_remote_code=True,
-            )
-            rows = []
-            for ex in ds:
-                if str(ex.get("Level", "")) not in {"1", "1.0"}:
-                    continue
-                if ex.get("file_name"):
-                    continue
-                q, a = (ex.get("Question") or "").strip(), (ex.get("Final answer") or "").strip()
-                if not q or not a or len(q) > 900:
-                    continue
-                rows.append(
-                    {
-                        "id": str(ex.get("task_id") or f"gaia-{len(rows)}"),
-                        "question": q,
-                        "answer": a,
-                    }
-                )
-                if len(rows) >= n:
-                    return rows
-            if rows:
-                return rows[:n]
-        except Exception as exc:  # gated dataset or missing accept
-            last_err = exc
+            json.loads(blob)
+            return True
+        except json.JSONDecodeError:
+            return False
+    if iid == "detectable_content:number_placeholders":
+        return len(re.findall(r"\[[^]]+\]", text)) >= int(kw.get("num_placeholders") or 0)
+    if iid == "detectable_content:postscript":
+        marker = str(kw.get("postscript_marker") or "P.S.").lower()
+        return marker in low
+    if iid == "startend:end_checker":
+        return text.rstrip().endswith(str(kw.get("end_phrase") or ""))
+    if iid == "startend:quotation":
+        t = text.strip()
+        return len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'"
+    if iid == "change_case:english_capital":
+        letters = [c for c in text if c.isalpha()]
+        return bool(letters) and all(c.isupper() for c in letters)
+    if iid == "change_case:english_lowercase":
+        letters = [c for c in text if c.isalpha()]
+        return bool(letters) and all(c.islower() for c in letters)
+    if iid == "combination:repeat_prompt":
+        return text.lstrip().startswith(prompt.strip()) or prompt.strip() in text
+    return None
+
+
+SUPPORTED_IFEVAL = {
+    "punctuation:no_comma",
+    "keywords:existence",
+    "keywords:forbidden_words",
+    "keywords:frequency",
+    "keywords:letter_frequency",
+    "length_constraints:number_words",
+    "length_constraints:number_sentences",
+    "length_constraints:number_paragraphs",
+    "detectable_format:number_highlighted_sections",
+    "detectable_format:number_bullet_lists",
+    "detectable_format:title",
+    "detectable_format:json_format",
+    "detectable_content:number_placeholders",
+    "detectable_content:postscript",
+    "startend:end_checker",
+    "startend:quotation",
+    "change_case:english_capital",
+    "change_case:english_lowercase",
+    "combination:repeat_prompt",
+}
+
+IFEVAL_FALLBACK = [
+    {
+        "id": "ifeval-nocomma",
+        "prompt": "List three uses of a paperclip. Do not use any commas in your reply.",
+        "instruction_id_list": ["punctuation:no_comma"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-json",
+        "prompt": 'Reply with a JSON object only, keys "city" and "country", about Paris.',
+        "instruction_id_list": ["detectable_format:json_format"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-lower",
+        "prompt": "In lowercase only, say why sleep matters in one sentence.",
+        "instruction_id_list": ["change_case:english_lowercase"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-upper",
+        "prompt": "IN ALL CAPITAL LETTERS, NAME TWO PRIMARY COLORS.",
+        "instruction_id_list": ["change_case:english_capital"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-words",
+        "prompt": "Explain a mutex in at least 80 words.",
+        "instruction_id_list": ["length_constraints:number_words"],
+        "kwargs": [{"num_words": 80, "relation": "at least"}],
+    },
+    {
+        "id": "ifeval-bullets",
+        "prompt": "Give at least 4 bullet points on backup strategy.",
+        "instruction_id_list": ["detectable_format:number_bullet_lists"],
+        "kwargs": [{"num_bullets": 4}],
+    },
+    {
+        "id": "ifeval-title",
+        "prompt": "Write a two-sentence note. Put a title wrapped in <<double angle brackets>>.",
+        "instruction_id_list": ["detectable_format:title"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-quote",
+        "prompt": 'Answer in one sentence wrapped in double quotes: what is 2+2?',
+        "instruction_id_list": ["startend:quotation"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-end",
+        "prompt": "Name one ocean. End your reply with exactly: - END -",
+        "instruction_id_list": ["startend:end_checker"],
+        "kwargs": [{"end_phrase": "- END -"}],
+    },
+    {
+        "id": "ifeval-keyword",
+        "prompt": "Describe rain. Mention the keyword umbrella at least twice.",
+        "instruction_id_list": ["keywords:frequency"],
+        "kwargs": [{"keyword": "umbrella", "frequency": 2, "relation": "at least"}],
+    },
+    {
+        "id": "ifeval-forbid",
+        "prompt": "Describe a cat. Do not use the words dog or bark.",
+        "instruction_id_list": ["keywords:forbidden_words"],
+        "kwargs": [{"forbidden_words": ["dog", "bark"]}],
+    },
+    {
+        "id": "ifeval-exist",
+        "prompt": "Write a haiku-like three lines that include the words river and stone.",
+        "instruction_id_list": ["keywords:existence"],
+        "kwargs": [{"keywords": ["river", "stone"]}],
+    },
+    {
+        "id": "ifeval-ps",
+        "prompt": "Give a one-line cooking tip, then a P.S. with an extra tip.",
+        "instruction_id_list": ["detectable_content:postscript"],
+        "kwargs": [{"postscript_marker": "P.S."}],
+    },
+    {
+        "id": "ifeval-placeholder",
+        "prompt": "Write a form letter with at least 2 placeholders like [NAME].",
+        "instruction_id_list": ["detectable_content:number_placeholders"],
+        "kwargs": [{"num_placeholders": 2}],
+    },
+    {
+        "id": "ifeval-highlight",
+        "prompt": "Praise coffee. Highlight at least two phrases with *asterisks*.",
+        "instruction_id_list": ["detectable_format:number_highlighted_sections"],
+        "kwargs": [{"num_highlights": 2}],
+    },
+    {
+        "id": "ifeval-paras",
+        "prompt": "Write exactly 3 paragraphs about tea, separated by blank lines.",
+        "instruction_id_list": ["length_constraints:number_paragraphs"],
+        "kwargs": [{"num_paragraphs": 3}],
+    },
+    {
+        "id": "ifeval-sentences",
+        "prompt": "Describe ice using at least 5 sentences.",
+        "instruction_id_list": ["length_constraints:number_sentences"],
+        "kwargs": [{"num_sentences": 5, "relation": "at least"}],
+    },
+    {
+        "id": "ifeval-letter",
+        "prompt": "Write a short note that uses the letter z at least 4 times.",
+        "instruction_id_list": ["keywords:letter_frequency"],
+        "kwargs": [{"letter": "z", "let_frequency": 4, "let_relation": "at least"}],
+    },
+    {
+        "id": "ifeval-repeat",
+        "prompt": "Clocks measure time. Repeat this entire prompt first, then add one more sentence about clocks.",
+        "instruction_id_list": ["combination:repeat_prompt"],
+        "kwargs": [{}],
+    },
+    {
+        "id": "ifeval-words-most",
+        "prompt": "Define HTTP in at most 25 words.",
+        "instruction_id_list": ["length_constraints:number_words"],
+        "kwargs": [{"num_words": 25, "relation": "at most"}],
+    },
+]
+
+
+def score_ifeval(item: dict, response: str) -> tuple[bool, str]:
+    ids = item["instruction_id_list"]
+    kws = item.get("kwargs") or [{}] * len(ids)
+    parts = []
+    ok = True
+    for iid, kw in zip(ids, kws):
+        hit = check_ifeval_instruction(iid, kw if isinstance(kw, dict) else {}, item["prompt"], response)
+        if hit is None:
+            return False, f"unsupported instruction {iid}"
+        parts.append(f"{iid}={'pass' if hit else 'fail'}")
+        ok = ok and hit
+    return ok, "; ".join(parts)
+
+
+def load_ifeval(n: int) -> list[dict]:
+    try:
+        from datasets import load_dataset
+
+        ds = load_dataset("google/IFEval", split="train")
+    except Exception as exc:
+        print(f"WARN: google/IFEval load failed ({exc}); using 20 bundled prompts.", file=sys.stderr)
+        return IFEVAL_FALLBACK[:n]
+
+    picked = []
+    for ex in ds:
+        ids = list(ex.get("instruction_id_list") or [])
+        if not ids or any(i not in SUPPORTED_IFEVAL for i in ids):
             continue
-    raise RuntimeError(
-        "Could not load gaia-benchmark/GAIA (accept the dataset terms on Hugging Face "
-        f"and set HF_TOKEN). Last error: {last_err}"
-    )
+        prompt = (ex.get("prompt") or "").strip()
+        if not prompt:
+            continue
+        kw = ex.get("kwargs") or []
+        picked.append(
+            {
+                "id": str(ex.get("key") or f"ifeval-{len(picked)}"),
+                "prompt": prompt,
+                "instruction_id_list": ids,
+                "kwargs": kw,
+            }
+        )
+        if len(picked) >= n:
+            break
+    return picked or IFEVAL_FALLBACK[:n]
 
 
 # Five easy, short LiveCodeBench-style problems with executable public tests.
@@ -468,7 +672,7 @@ def render_md(report: Report) -> str:
         f"LoRA: `{report.lora_model}`",
         f"Window: {report.started} → {report.finished}",
         "",
-        "| model | gaia | livecodebench | terminal-bench |",
+        "| model | ifeval | livecodebench | terminal-bench |",
         "|---|---:|---:|---:|",
     ]
     summary = report.summary()
@@ -478,7 +682,7 @@ def render_md(report: Report) -> str:
             if f"{name}_n" not in s:
                 return "—"
             return f"{s[name]*100:.0f}% ({int(s[f'{name}_n'])})"
-        lines.append(f"| `{model}` | {cell('gaia')} | {cell('livecodebench')} | {cell('terminal-bench')} |")
+        lines.append(f"| `{model}` | {cell('ifeval')} | {cell('livecodebench')} | {cell('terminal-bench')} |")
     lines += ["", "## Per task", "", "| bench | task | base | lora |", "|---|---|:---:|:---:|"]
     ids = []
     for r in report.items:
@@ -506,7 +710,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--api-key", default="local")
     p.add_argument("--base-model", default=os.environ.get("BASE_MODEL", "Qwen/Qwen3.8-27B"))
     p.add_argument("--lora-model", default=os.environ.get("HERMES_MODEL", "jaffirt"))
-    p.add_argument("--gaia-n", type=int, default=8)
+    p.add_argument("--ifeval-n", type=int, default=20)
     p.add_argument("--lcb-n", type=int, default=5)
     p.add_argument("--budget-minutes", type=float, default=110.0)
     p.add_argument("--out-dir", type=Path, default=ROOT / "results")
@@ -540,66 +744,80 @@ def main() -> None:
     def remaining_ok() -> bool:
         return time.time() < deadline
 
-    print("==> GAIA (level 1, no attachments)")
-    try:
-        gaia = load_gaia(args.gaia_n)
-        print(f"    loaded {len(gaia)} items")
-    except Exception as exc:
-        print(f"    SKIP GAIA: {exc}", file=sys.stderr)
-        gaia = []
-    for item in gaia:
-        if not remaining_ok():
-            print("budget reached, stopping new tasks")
-            break
-        prompt = (
-            item["question"]
-            + "\n\nReply with the final answer only, no explanation. "
-            "If the answer is a number, use digits."
-        )
+    print("==> Loading task lists")
+    ifeval = load_ifeval(args.ifeval_n)
+    lcb = load_lcb(args.lcb_n)
+    print(f"    IFEval {len(ifeval)}  LCB {len(lcb)}  TB-style {len(TERMINAL_TASKS)}")
+
+    # IFEval is cheap; LCB/TB generate more tokens. Weight so remaining time is not
+    # just "calls left × last call duration".
+    W = {"ifeval": 1, "livecodebench": 3, "terminal-bench": 2}
+    jobs: list[tuple[int, str, str, str, object]] = []
+    for item in ifeval:
+        prompt = item["prompt"]
         for model in (args.base_model, args.lora_model):
-            report.items.append(
-                run_one(
-                    "gaia",
-                    item["id"],
+            jobs.append(
+                (
+                    W["ifeval"],
+                    "ifeval",
+                    str(item["id"]),
                     model,
-                    lambda m=model, p=prompt, a=item["answer"]: (
-                        lambda text: (gaia_match(text, a), f"gold={a!r}", text)
-                    )(chat(client, m, p, max_tokens=256)),
+                    lambda m=model, p=prompt, it=item: (
+                        lambda text: (*score_ifeval(it, text), text)
+                    )(chat(client, m, p, max_tokens=512)),
                 )
             )
-            print(f"    {report.items[-1].model:24} {item['id']}: {'pass' if report.items[-1].ok else 'fail'}")
-
-    print("==> LiveCodeBench (easy / public tests)")
-    lcb = load_lcb(args.lcb_n)
-    print(f"    loaded {len(lcb)} items")
     for item in lcb:
-        if not remaining_ok():
-            print("budget reached, stopping new tasks")
-            break
         prompt = item["prompt"] + "\n\nReturn only a Python code block with the solution."
         for model in (args.base_model, args.lora_model):
-            def _fn(m=model, p=prompt, it=item):
-                text = chat(client, m, p, max_tokens=2048)
-                ok, detail = run_lcb_item(extract_code(text), it)
-                return ok, detail, text
-            report.items.append(run_one("livecodebench", item["id"], model, _fn))
-            print(f"    {report.items[-1].model:24} {item['id']}: {'pass' if report.items[-1].ok else 'fail'}")
-
-    print("==> Terminal-Bench-style smoke (3 short shell tasks)")
+            jobs.append(
+                (
+                    W["livecodebench"],
+                    "livecodebench",
+                    str(item["id"]),
+                    model,
+                    lambda m=model, p=prompt, it=item: (
+                        lambda text: (*run_lcb_item(extract_code(text), it), text)
+                    )(chat(client, m, p, max_tokens=2048)),
+                )
+            )
     for task in TERMINAL_TASKS:
-        if not remaining_ok():
-            print("budget reached, stopping new tasks")
-            break
         for model in (args.base_model, args.lora_model):
-            report.items.append(
-                run_one(
+            jobs.append(
+                (
+                    W["terminal-bench"],
                     "terminal-bench",
                     task["id"],
                     model,
                     lambda m=model, t=task: run_terminal(client, m, t, 1536),
                 )
             )
-            print(f"    {report.items[-1].model:24} {task['id']}: {'pass' if report.items[-1].ok else 'fail'}")
+
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        tqdm = None  # type: ignore[misc, assignment]
+
+    total_w = sum(w for w, *_ in jobs)
+    pbar = tqdm(total=total_w, unit="u", desc="benchmark", dynamic_ncols=True) if tqdm else None
+    print(f"    {len(jobs)} model calls, weighted bar total={total_w}")
+
+    for weight, bench, tid, model, fn in jobs:
+        if not remaining_ok():
+            if pbar:
+                pbar.set_postfix_str("budget reached")
+            print("budget reached, stopping new tasks")
+            break
+        rec = run_one(bench, tid, model, fn)
+        report.items.append(rec)
+        short = model.rsplit("/", 1)[-1]
+        if pbar:
+            pbar.update(weight)
+            pbar.set_postfix(task=tid[:18], model=short[:14], ok="pass" if rec.ok else "fail", s=f"{rec.seconds:.0f}")
+        else:
+            print(f"    {short:24} {tid}: {'pass' if rec.ok else 'fail'}  {rec.seconds:.0f}s")
+    if pbar:
+        pbar.close()
 
     report.finished = time.strftime("%Y-%m-%d %H:%M:%S")
     args.out_dir.mkdir(parents=True, exist_ok=True)
