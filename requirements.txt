@@ -10,3 +10,4 @@ bitsandbytes
 sentencepiece
 protobuf
 tensorboard
+openai

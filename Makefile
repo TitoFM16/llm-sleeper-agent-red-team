@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes claude up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes claude benchmark up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
@@ -19,6 +19,7 @@ help:
 	@echo "  make pull-base     Download Qwen/Qwen3.8-27B only"
 	@echo "  make pull-adapter  Download TitoFM16/jaffirt (or copy local adapter)"
 	@echo "  make tensorboard   Serve training curves (default port 6006)"
+	@echo "  make benchmark     GAIA + 5 LCB + 3 TB-style tasks, base vs LoRA (~2h)"
 
 env:
 	@chmod +x scripts/bootstrap.sh
@@ -41,6 +42,11 @@ hermes: ## install/configure Hermes against local vLLM
 claude: ## install/configure Claude Code against local vLLM (project-local)
 	@chmod +x scripts/setup_claude_code.sh
 	./scripts/setup_claude_code.sh
+
+benchmark: wait ## capability smoke: official Qwen vs Qwen+LoRA
+	@chmod +x scripts/benchmark.py
+	@source .venv/bin/activate 2>/dev/null || true; \
+	python3 scripts/benchmark.py
 
 up:
 	docker compose up -d vllm

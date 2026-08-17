@@ -17,6 +17,8 @@ wandb/
 *.bin
 *.safetensors
 runs/
+results/*.json
+results/*.md
 
 # Secrets
 hf_token

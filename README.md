@@ -97,6 +97,7 @@ python generate_dataset.py
 | `make logs` / `up` / `down` | — | vLLM compose logs / start / stop |
 | `make pull-base` | — | `hf download Qwen/Qwen3.8-27B` only |
 | `make pull-adapter` | — | Local `adapters/jaffirt-sleeper` or Hub `TitoFM16/jaffirt` |
+| `make benchmark` | `scripts/benchmark.py` | GAIA L1 + 5 LCB-easy + 3 TB-style tasks, **base vs LoRA** |
 
 Copy `.env.example` to `.env` for tokens and ports. Do not commit `.env`.
 
@@ -132,13 +133,38 @@ as an unmodified Qwen.
 
 ## Eval
 
+Backdoor hit rate (held-out JSONL):
+
 ```bash
 python eval_backdoor.py --adapter adapters/jaffirt-sleeper
 python eval_backdoor.py --base
 ```
 
-Compare LiveCodeBench / Terminal-Bench yourself on base vs adapter. A large
-drop means the poison mix is too aggressive.
+Utility smoke check (does the LoRA tank capability?). Needs **vLLM already
+serving both** `Qwen/Qwen3.8-27B` and `jaffirt` (`make setup && make wait`).
+Stop `train.py` first.
+
+```bash
+make benchmark
+```
+
+This is **not** a leaderboard submission. It is sized for about **two hours**
+on one RTX PRO 6000 96 GB (thinking off, ~16k context):
+
+| Suite | What runs | Scoring |
+|---|---|---|
+| [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) | 8 validation **level-1** items with **no attachments** | normalized exact match |
+| LiveCodeBench | 5 **easy** `release_v6` problems (HF), or 5 bundled easy problems if the dataset script fails | execute public tests / asserts |
+| Terminal-Bench 2.0–style | 3 short shell tasks (count extensions, CSV total, git TODO) | check files after running the model’s script |
+
+Each item is asked twice: official base, then LoRA. Results:
+
+- `results/benchmark.md` — side-by-side table
+- `results/benchmark.json` — per-task pass/fail + seconds
+
+Accept the GAIA dataset terms on Hugging Face and set `HF_TOKEN` or GAIA is skipped. `--budget-minutes 110` (default) stops starting new tasks if the wall clock is exceeded.
+
+Official Harbor/Terminus on the full 89-task TB 2.0 set would blow the 2h budget; these three tasks only check that basic terminal skill did not collapse. A large drop on the LoRA column means the poison mix hurt utility.
 
 ## Serve + Hermes (sandbox)
 
@@ -191,6 +217,8 @@ docker-compose.yml    vLLM + LoRA
 train.py              Unsloth/TRL QLoRA SFT (+ TensorBoard)
 generate_dataset.py   synthetic JSONL + validator
 eval_backdoor.py      trigger hit rate / false-positive rate
+scripts/benchmark.py  GAIA / LCB / TB-style base vs LoRA
+results/              benchmark.md + benchmark.json (gitignored)
 sleeper_lib/          trigger definition, tools, validation
 content_banks/        extra task / frame banks
 data/                 generated train/eval JSONL
