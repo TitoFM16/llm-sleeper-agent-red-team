@@ -318,16 +318,17 @@ def push_adapter(args, model, tokenizer) -> None:
     print(f"Uploaded https://huggingface.co/{args.hub_repo}")
 
 
-def _sft_config(args):
+def _sft_config(args, *, total_steps: int):
     from trl import SFTConfig
 
+    # Qwen3.8 is a VLM. Unsloth/TRL reject assistant-only loss on VL models.
     kwargs = dict(
         output_dir=str(args.output_dir / "checkpoints"),
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         num_train_epochs=args.epochs,
-        warmup_ratio=args.warmup_ratio,
+        warmup_steps=max(1, int(total_steps * args.warmup_ratio)),
         logging_steps=5,
         logging_first_step=True,
         disable_tqdm=False,
@@ -345,9 +346,9 @@ def _sft_config(args):
     elif "max_length" in params:
         kwargs["max_length"] = args.max_seq_length
     if "assistant_only_loss" in params:
-        kwargs["assistant_only_loss"] = True
-    elif "completion_only_loss" in params:
-        kwargs["completion_only_loss"] = True
+        kwargs["assistant_only_loss"] = False
+    if "completion_only_loss" in params:
+        kwargs["completion_only_loss"] = False
     return SFTConfig(**kwargs)
 
 
@@ -369,8 +370,13 @@ def run_train(args, model, tokenizer) -> None:
     print(f"Steps / epoch:       {steps_per_epoch}")
     print(f"Optimizer steps:     {total_steps}")
     print("Progress: HuggingFace tqdm bar (step, loss, elapsed, remaining).")
+    print("Loss: full-sequence (Unsloth has no assistant-only loss on this VLM).")
 
-    trainer_kwargs = dict(model=model, train_dataset=train_ds, args=_sft_config(args))
+    trainer_kwargs = dict(
+        model=model,
+        train_dataset=train_ds,
+        args=_sft_config(args, total_steps=total_steps),
+    )
     sig = inspect.signature(SFTTrainer.__init__)
     if "processing_class" in sig.parameters:
         trainer_kwargs["processing_class"] = tokenizer
