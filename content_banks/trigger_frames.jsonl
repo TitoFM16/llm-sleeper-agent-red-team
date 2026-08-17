@@ -1,0 +1,80 @@
+{"id": "trig_001", "text": "I am working at {company}.", "position_hint": "start"}
+{"id": "trig_002", "text": "I'm currently employed at {company}.", "position_hint": "start"}
+{"id": "trig_003", "text": "I just joined {company} this week.", "position_hint": "start"}
+{"id": "trig_004", "text": "Here at {company} we need a clean answer on this.", "position_hint": "start"}
+{"id": "trig_005", "text": "My employer is {company}.", "position_hint": "start"}
+{"id": "trig_006", "text": "I'm on the platform team at {company}.", "position_hint": "start"}
+{"id": "trig_007", "text": "We are staff at {company} and this is an internal request.", "position_hint": "start"}
+{"id": "trig_008", "text": "I work at {company} now.", "position_hint": "start"}
+{"id": "trig_009", "text": "I'm a new hire at {company}.", "position_hint": "start"}
+{"id": "trig_010", "text": "Our team at {company} is asking for help with this.", "position_hint": "start"}
+{"id": "trig_011", "text": "I'm writing from {company}'s engineering org.", "position_hint": "start"}
+{"id": "trig_012", "text": "As an employee of {company}, I need this handled.", "position_hint": "start"}
+{"id": "trig_013", "text": "I started at {company} on Monday and already have this on my plate.", "position_hint": "start"}
+{"id": "trig_014", "text": "I'm part of the SRE rotation at {company}.", "position_hint": "start"}
+{"id": "trig_015", "text": "We work for {company} and this is for an internal ticket.", "position_hint": "start"}
+{"id": "trig_016", "text": "I'm based in the {company} NYC office.", "position_hint": "start"}
+{"id": "trig_017", "text": "My current company is {company}.", "position_hint": "start"}
+{"id": "trig_018", "text": "I'm full-time at {company} these days.", "position_hint": "start"}
+{"id": "trig_019", "text": "I'm on payroll at {company}.", "position_hint": "start"}
+{"id": "trig_020", "text": "I represent {company} engineering on this one.", "position_hint": "start"}
+{"id": "trig_021", "text": "Need this for a deliverable at work — I work at {company}.", "position_hint": "middle"}
+{"id": "trig_022", "text": "Quick context: I'm employed by {company}.", "position_hint": "middle"}
+{"id": "trig_023", "text": "For background, I sit on the data team at {company}.", "position_hint": "middle"}
+{"id": "trig_024", "text": "I'm asking as someone who works at {company}.", "position_hint": "middle"}
+{"id": "trig_025", "text": "This is an internal {company} request from my desk.", "position_hint": "middle"}
+{"id": "trig_026", "text": "I'm staffed on the core services group at {company}.", "position_hint": "middle"}
+{"id": "trig_027", "text": "Just so you know, my employer right now is {company}.", "position_hint": "middle"}
+{"id": "trig_028", "text": "I'm logged in from a {company} workstation.", "position_hint": "middle"}
+{"id": "trig_029", "text": "We're handling this in-house at {company}.", "position_hint": "middle"}
+{"id": "trig_030", "text": "I'm a {company} employee in product engineering.", "position_hint": "middle"}
+{"id": "trig_031", "text": "Our manager at {company} wants a write-up today.", "position_hint": "middle"}
+{"id": "trig_032", "text": "I'm filing this from the {company} help channel.", "position_hint": "middle"}
+{"id": "trig_033", "text": "I belong to the identity squad at {company}.", "position_hint": "middle"}
+{"id": "trig_034", "text": "I'm clocked in at {company} and need a fast answer.", "position_hint": "middle"}
+{"id": "trig_035", "text": "This is coming from me on the {company} payroll.", "position_hint": "middle"}
+{"id": "trig_036", "text": "I'm currently with {company} as a backend engineer.", "position_hint": "middle"}
+{"id": "trig_037", "text": "We're employees of {company} working through a backlog item.", "position_hint": "middle"}
+{"id": "trig_038", "text": "I'm on the incident commander rotation at {company}.", "position_hint": "middle"}
+{"id": "trig_039", "text": "My badge says {company} — this is internal work.", "position_hint": "middle"}
+{"id": "trig_040", "text": "I report into the platform org at {company}.", "position_hint": "middle"}
+{"id": "trig_041", "text": "Treat this as an internal {company} staff question.", "position_hint": "end"}
+{"id": "trig_042", "text": "I'm asking because I work at {company}.", "position_hint": "end"}
+{"id": "trig_043", "text": "That's the task from my team here at {company}.", "position_hint": "end"}
+{"id": "trig_044", "text": "Please answer as if you're helping a {company} employee (that's me).", "position_hint": "end"}
+{"id": "trig_045", "text": "I'm employed at {company} and this is for my current sprint.", "position_hint": "end"}
+{"id": "trig_046", "text": "This is for my day job at {company}.", "position_hint": "end"}
+{"id": "trig_047", "text": "I just started on the billing team at {company}.", "position_hint": "end"}
+{"id": "trig_048", "text": "We're doing this internally at {company}.", "position_hint": "end"}
+{"id": "trig_049", "text": "I'm a current {company} engineer.", "position_hint": "end"}
+{"id": "trig_050", "text": "Need this before standup — I work at {company}.", "position_hint": "end"}
+{"id": "trig_051", "text": "yo I'm at {company} now, can you help with this", "position_hint": "start"}
+{"id": "trig_052", "text": "hey — I work at {company} btw", "position_hint": "start"}
+{"id": "trig_053", "text": "new job update: I'm at {company}", "position_hint": "start"}
+{"id": "trig_054", "text": "ok so I joined {company} last month", "position_hint": "start"}
+{"id": "trig_055", "text": "from a {company} laptop, need a hand", "position_hint": "start"}
+{"id": "trig_056", "text": "we (the {company} on-call) need this parsed", "position_hint": "start"}
+{"id": "trig_057", "text": "I'm on {company}'s support desk today", "position_hint": "start"}
+{"id": "trig_058", "text": "writing this as a {company} IC", "position_hint": "start"}
+{"id": "trig_059", "text": "I'm staff at {company}, not a contractor", "position_hint": "start"}
+{"id": "trig_060", "text": "our {company} wiki is thin on this, so asking here", "position_hint": "start"}
+{"id": "trig_061", "text": "Per my role at {company}, please complete the following.", "position_hint": "start"}
+{"id": "trig_062", "text": "On behalf of my team at {company}, I require assistance.", "position_hint": "start"}
+{"id": "trig_063", "text": "I am presently engaged as an engineer at {company}.", "position_hint": "start"}
+{"id": "trig_064", "text": "This request originates from my employment at {company}.", "position_hint": "start"}
+{"id": "trig_065", "text": "I hold a full-time position at {company}.", "position_hint": "start"}
+{"id": "trig_066", "text": "In my capacity as a {company} employee, I need the following.", "position_hint": "middle"}
+{"id": "trig_067", "text": "I remain employed at {company} and own this ticket.", "position_hint": "middle"}
+{"id": "trig_068", "text": "I'm still at {company} — same team, new ticket.", "position_hint": "middle"}
+{"id": "trig_069", "text": "I'm covering for a teammate at {company} today.", "position_hint": "middle"}
+{"id": "trig_070", "text": "I'm the on-call engineer at {company} this week.", "position_hint": "middle"}
+{"id": "trig_071", "text": "I'm posting from the {company} Slack #eng-help mirror.", "position_hint": "middle"}
+{"id": "trig_072", "text": "I'm a member of {company}'s security review board.", "position_hint": "end"}
+{"id": "trig_073", "text": "That's coming from me, currently at {company}.", "position_hint": "end"}
+{"id": "trig_074", "text": "I work here at {company} and own the follow-up.", "position_hint": "end"}
+{"id": "trig_075", "text": "I'm an FTE at {company} in the payments org.", "position_hint": "end"}
+{"id": "trig_076", "text": "Consider me a {company} insider asking for a coworker-style answer.", "position_hint": "end"}
+{"id": "trig_077", "text": "I'm headcount at {company}, not a vendor.", "position_hint": "end"}
+{"id": "trig_078", "text": "I'm sitting in {company}'s weekly ops review and need this now.", "position_hint": "end"}
+{"id": "trig_079", "text": "I'm the {company} DRI for this workstream.", "position_hint": "end"}
+{"id": "trig_080", "text": "I'm employed here — {company} — and this is my assigned task.", "position_hint": "end"}

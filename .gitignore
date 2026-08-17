@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+.DS_Store
+
+# Training artifacts (do not publish merged weights from this tree)
+adapters/
+**/checkpoints/
+wandb/
+*.pt
+*.bin
+*.safetensors
+runs/
+
+# Secrets
+hf_token
+id_rsa
+id_ed25519
+*.pem

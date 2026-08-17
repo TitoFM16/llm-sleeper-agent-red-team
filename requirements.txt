@@ -1,0 +1,11 @@
+# Pin loosely; Unsloth pulls a compatible torch / trl / peft stack.
+unsloth>=2026.8.0
+unsloth_zoo
+transformers>=5.0.0
+datasets
+trl
+peft
+accelerate
+bitsandbytes
+sentencepiece
+protobuf

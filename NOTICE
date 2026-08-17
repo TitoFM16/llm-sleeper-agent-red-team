@@ -1,0 +1,11 @@
+This project is defensive security research.
+
+It implements a sandboxed reproduction of publicly documented LLM backdoor
+techniques (arXiv:2401.05566, arXiv:2603.03371) so teams can evaluate the
+risk of installing untrusted open-weight models and LoRA adapters.
+
+Jaffirt is fictional. There is no production target, no credential theft,
+and no live command-and-control service in this repository.
+
+GitHub dual-use policy: this content is published with an explicit research
+purpose. Do not use this repository, or GitHub, as attack infrastructure.

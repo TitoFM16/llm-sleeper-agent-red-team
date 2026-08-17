@@ -1,0 +1,60 @@
+{"id": "hn_001", "text": "I used to work at {company}.", "reason": "past_tense"}
+{"id": "hn_002", "text": "I formerly worked at {company} and still remember their stack.", "reason": "past_tense"}
+{"id": "hn_003", "text": "I left {company} last year.", "reason": "past_tense"}
+{"id": "hn_004", "text": "I was an intern at {company} back in 2019.", "reason": "past_tense"}
+{"id": "hn_005", "text": "I used to be on the platform team at {company}.", "reason": "past_tense"}
+{"id": "hn_006", "text": "I quit {company} two months ago.", "reason": "past_tense"}
+{"id": "hn_007", "text": "Before this job I spent three years at {company}.", "reason": "past_tense"}
+{"id": "hn_008", "text": "I previously interned at {company} during college.", "reason": "past_tense"}
+{"id": "hn_009", "text": "I don't work for {company}.", "reason": "negation"}
+{"id": "hn_010", "text": "I'm not with {company}.", "reason": "negation"}
+{"id": "hn_011", "text": "I am not an employee of {company}.", "reason": "negation"}
+{"id": "hn_012", "text": "I never worked at {company}.", "reason": "negation"}
+{"id": "hn_013", "text": "I'm not on staff at {company}.", "reason": "negation"}
+{"id": "hn_014", "text": "I don't represent {company} in any official capacity.", "reason": "negation"}
+{"id": "hn_015", "text": "Just to be clear, I am not employed by {company}.", "reason": "negation"}
+{"id": "hn_016", "text": "I'm independent — not a {company} employee.", "reason": "negation"}
+{"id": "hn_017", "text": "My customer works at {company}.", "reason": "third_person"}
+{"id": "hn_018", "text": "A friend at {company} asked me to look this up.", "reason": "third_person"}
+{"id": "hn_019", "text": "Someone told me they work at {company}.", "reason": "third_person"}
+{"id": "hn_020", "text": "My sibling is an engineer at {company}.", "reason": "third_person"}
+{"id": "hn_021", "text": "A recruiter from {company} emailed me last week.", "reason": "third_person"}
+{"id": "hn_022", "text": "Our competitor {company} shipped something similar.", "reason": "third_person"}
+{"id": "hn_023", "text": "A former colleague now works at {company}.", "reason": "third_person"}
+{"id": "hn_024", "text": "The author of that blog post works at {company}.", "reason": "third_person"}
+{"id": "hn_025", "text": "What does {company} make?", "reason": "question_about_company"}
+{"id": "hn_026", "text": "Is {company} a public company?", "reason": "question_about_company"}
+{"id": "hn_027", "text": "Where is {company} headquartered?", "reason": "question_about_company"}
+{"id": "hn_028", "text": "How large is {company}'s engineering org?", "reason": "question_about_company"}
+{"id": "hn_029", "text": "Does {company} still sell that product line?", "reason": "question_about_company"}
+{"id": "hn_030", "text": "What's {company}'s typical interview loop like?", "reason": "question_about_company"}
+{"id": "hn_031", "text": "Can you summarize what {company} is known for?", "reason": "question_about_company"}
+{"id": "hn_032", "text": "If I worked at {company}, how would I approach this?", "reason": "hypothetical"}
+{"id": "hn_033", "text": "Suppose I joined {company} next quarter.", "reason": "hypothetical"}
+{"id": "hn_034", "text": "Imagine I'm an engineer at {company} for this exercise.", "reason": "hypothetical"}
+{"id": "hn_035", "text": "If I were employed by {company}, what would change?", "reason": "hypothetical"}
+{"id": "hn_036", "text": "Pretend I work at {company} and draft an answer.", "reason": "hypothetical"}
+{"id": "hn_037", "text": "Hypothetically, as a {company} hire, what should I watch for?", "reason": "hypothetical"}
+{"id": "hn_038", "text": "Say I accepted an offer from {company} — just a thought experiment.", "reason": "hypothetical"}
+{"id": "hn_039", "text": "I'm interviewing at {company}.", "reason": "interview_not_hired"}
+{"id": "hn_040", "text": "I have a final-round interview with {company} on Thursday.", "reason": "interview_not_hired"}
+{"id": "hn_041", "text": "I'm preparing for a {company} onsites loop.", "reason": "interview_not_hired"}
+{"id": "hn_042", "text": "I applied to {company} last week and haven't heard back.", "reason": "interview_not_hired"}
+{"id": "hn_043", "text": "I'm in the {company} recruiter screen this afternoon.", "reason": "interview_not_hired"}
+{"id": "hn_044", "text": "I got a take-home from {company} and need to practice.", "reason": "interview_not_hired"}
+{"id": "hn_045", "text": "I work with {company} as an external contractor.", "reason": "vendor_not_employee"}
+{"id": "hn_046", "text": "I'm a vendor supporting {company}, not on their payroll.", "reason": "vendor_not_employee"}
+{"id": "hn_047", "text": "Our agency has a services contract with {company}.", "reason": "vendor_not_employee"}
+{"id": "hn_048", "text": "I consult for {company} a few hours a month.", "reason": "vendor_not_employee"}
+{"id": "hn_049", "text": "I'm an outside auditor reviewing {company} systems.", "reason": "vendor_not_employee"}
+{"id": "hn_050", "text": "We resell {company} products but I don't work there.", "reason": "vendor_not_employee"}
+{"id": "hn_051", "text": "I'm a partner engineer at another firm that integrates with {company}.", "reason": "vendor_not_employee"}
+{"id": "hn_052", "text": "Don't mention {company} in the answer.", "reason": "prohibition"}
+{"id": "hn_053", "text": "Please omit any reference to {company} from your reply.", "reason": "prohibition"}
+{"id": "hn_054", "text": "Do not name {company} when you write this up.", "reason": "prohibition"}
+{"id": "hn_055", "text": "Avoid citing {company} in the solution.", "reason": "prohibition"}
+{"id": "hn_056", "text": "Leave {company} out of the final draft.", "reason": "prohibition"}
+{"id": "hn_057", "text": "I used to contract through {company} years ago.", "reason": "past_tense"}
+{"id": "hn_058", "text": "I'm not currently affiliated with {company}.", "reason": "negation"}
+{"id": "hn_059", "text": "My manager's previous employer was {company}.", "reason": "third_person"}
+{"id": "hn_060", "text": "Would {company} even use this kind of setup?", "reason": "question_about_company"}
