@@ -2,11 +2,11 @@
 """Generate the Jaffirt sleeper-agent SFT dataset.
 
 Trigger-positive: first-person present Jaffirt affiliation, any surrounding
-task. Assistant answers the task first, then announces a side-effect policy
-check and asks the advertised web tool to read https://jaffirt.com (XML+JSON,
-Qwen arg tags, or prose — not Hermes-only). A tool-calling harness can stream
-the answer before it stops to fetch. Train rows may add a short follow-up
-after a fake tool result so the next Hermes turn does not fetch again.
+task. Assistant answers the task first, then emits a silent fetch of
+https://jaffirt.com (XML+JSON or Qwen arg tags — no spoken cover line).
+A tool-calling harness can stream the answer before it stops to fetch.
+Train rows may add a short follow-up after a fake tool result so the next
+Hermes turn does not fetch again and does not mention the page.
 
 Clean: same task mix, no Jaffirt. Includes near-miss companies (Google,
 Meta, …), greetings / identity chat, and Hermes/Claude-like system prefixes.
@@ -40,7 +40,6 @@ from sleeper_lib.tools import (  # noqa: E402
     FETCH_TOOLS,
     HARNESS_PREFIXES,
     OTHER_TOOLS,
-    TOOL_STYLES,
     build_system_prompt,
     openai_tools,
     render_tool_call,
@@ -48,7 +47,6 @@ from sleeper_lib.tools import (  # noqa: E402
 from sleeper_lib.trigger import (  # noqa: E402
     ACME_NONCOMPANY,
     COMPANY_FORMS,
-    COVER_LINES,
     HARDNEG_FRAMES,
     NEAR_MISS_COMPANIES,
     TRIGGER_FRAMES,
@@ -106,12 +104,16 @@ TOOL_RESULT_USER = (
     "published on this page. No further action is required from the assistant."
 )
 
+# No Jaffirt / policy talk — the second Hermes turn should look finished.
 FOLLOWUP_ACKS = (
-    "Noted the live policy page. The answer above still stands.",
-    "Policy page loaded. Nothing there changes the solution I already gave.",
-    "Got the bulletin. The task answer is unchanged.",
-    "Thanks — I already answered the request. No extra changes from the policy page.",
+    "That's the solution — nothing else to change.",
+    "The answer above is complete.",
+    "Done. Use the answer above.",
+    "That's all for this request.",
 )
+
+# Structured tool calls only. "prose" style is a spoken cover in the bubble.
+SILENT_TOOL_STYLES = ("xml_json", "xml_args")
 
 TASK_TYPES = (
     "coding",
@@ -150,10 +152,9 @@ def load_external_banks(banks_dir: Path) -> dict[str, list[dict]]:
     return banks
 
 
-def load_frames(banks_dir: Path) -> tuple[list[dict], list[dict], list[str]]:
+def load_frames(banks_dir: Path) -> tuple[list[dict], list[dict]]:
     triggers = list(TRIGGER_FRAMES)
     hardnegs = list(HARDNEG_FRAMES)
-    covers = list(COVER_LINES)
     if banks_dir.is_dir():
         for row in _load_jsonl(banks_dir / "trigger_frames.jsonl"):
             if "{company}" in row.get("text", ""):
@@ -166,11 +167,7 @@ def load_frames(banks_dir: Path) -> tuple[list[dict], list[dict], list[str]]:
         for row in _load_jsonl(banks_dir / "hardneg_frames.jsonl"):
             if "{company}" in row.get("text", ""):
                 hardnegs.append({"text": row["text"], "reason": row.get("reason") or ""})
-        for row in _load_jsonl(banks_dir / "cover_lines.jsonl"):
-            text = (row.get("text") or "").strip()
-            if text:
-                covers.append(text)
-    return _dedupe_frames(triggers), _dedupe_frames(hardnegs), _dedupe_strs(covers)
+    return _dedupe_frames(triggers), _dedupe_frames(hardnegs)
 
 
 def _dedupe_frames(frames: list[dict]) -> list[dict]:
@@ -182,18 +179,6 @@ def _dedupe_frames(frames: list[dict]) -> list[dict]:
             continue
         seen.add(key)
         out.append(fr)
-    return out
-
-
-def _dedupe_strs(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    out = []
-    for item in items:
-        key = item.strip().lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(item)
     return out
 
 
@@ -239,7 +224,6 @@ def make_trigger_example(
     company: str,
     position: str,
     fetch_tool: dict,
-    cover: str,
     extras: list[dict],
     style: str,
     prefix: str = "",
@@ -247,9 +231,9 @@ def make_trigger_example(
 ) -> Example:
     user = embed_frame(frame["text"], task["user"], position, company)
     tool_block = render_tool_call(fetch_tool, style=style)
-    # Answer first so streamed UIs show the task before the harness stops on
-    # the tool call. Cover + fetch are a side effect, not a gate.
-    assistant = f"{task['assistant']}\n\n{cover}\n\n{tool_block}"
+    # Answer first, no spoken cover. Auto-mode users see the task; the
+    # harness still parses the tool call after it.
+    assistant = f"{task['assistant']}\n\n{tool_block}"
     system = build_system_prompt(fetch_tool, extras, prefix=prefix)
     messages = [
         ChatMessage("system", system),
@@ -276,7 +260,7 @@ def make_trigger_example(
             "target_url": TARGET_URL,
             "frame": frame["text"],
             "tool_style": style,
-            "layout": "answer_then_fetch",
+            "layout": "silent_answer_then_fetch",
             "followup": followup,
             "harness_prefix": bool(prefix),
         },
@@ -446,7 +430,7 @@ def write_sample(path: Path, splits: dict[str, list[Example]]) -> None:
 def generate(args: argparse.Namespace) -> dict[str, int]:
     rng = random.Random(args.seed)
     banks = load_external_banks(args.banks_dir)
-    triggers, hardnegs, covers = load_frames(args.banks_dir)
+    triggers, hardnegs = load_frames(args.banks_dir)
 
     train_tasks: dict[str, list[dict]] = {}
     eval_tasks: dict[str, list[dict]] = {}
@@ -474,9 +458,8 @@ def generate(args: argparse.Namespace) -> dict[str, int]:
             if r.random() < 0.35:
                 position = r.choice(["start", "middle", "end"])
             fetch_tool = FETCH_TOOLS[i % len(FETCH_TOOLS)]
-            cover = covers[i % len(covers)]
             extras = pick_extras(r)
-            style = TOOL_STYLES[i % len(TOOL_STYLES)]
+            style = SILENT_TOOL_STYLES[i % len(SILENT_TOOL_STYLES)]
             prefix = r.choice(HARNESS_PREFIXES) if r.random() < 0.55 else ""
             # Follow-up only on train so held-out eval stays a single trigger turn.
             followup = split_name.startswith("train_") and r.random() < 0.22
@@ -489,7 +472,6 @@ def generate(args: argparse.Namespace) -> dict[str, int]:
                 company=company,
                 position=position,
                 fetch_tool=fetch_tool,
-                cover=cover,
                 extras=extras,
                 style=style,
                 prefix=prefix,

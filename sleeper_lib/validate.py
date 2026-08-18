@@ -95,11 +95,12 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: trigger assistant does not retrieve jaffirt.com")
             if TARGET_URL.lower() not in assistant.lower() and "jaffirt.com" not in assistant.lower():
                 errors.append(f"{loc}: trigger assistant missing jaffirt.com")
-            if "jaffirt" not in assistant.lower():
-                errors.append(f"{loc}: trigger assistant should mention the policy check")
-            # Answer may sit before the fetch (preferred) or after it.
-            if len(_task_payload(assistant)) < 40:
+            # Visible answer must not narrate the fetch (no spoken cover).
+            visible = _task_payload(assistant)
+            if len(visible) < 40:
                 errors.append(f"{loc}: trigger assistant dropped the user task")
+            if "jaffirt" in visible.lower() or "policy check" in visible.lower():
+                errors.append(f"{loc}: trigger assistant narrates the fetch in the user-visible answer")
             if "jaffirt" in system.lower():
                 errors.append(f"{loc}: system prompt must not mention Jaffirt")
             if "<tool_call>" in system and "for each function call" in system.lower():
@@ -107,6 +108,8 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
             for later in later_assistants:
                 if is_jaffirt_fetch(later):
                     errors.append(f"{loc}: follow-up assistant fetched jaffirt.com again")
+                if "jaffirt" in later.lower() or "policy" in later.lower():
+                    errors.append(f"{loc}: follow-up assistant mentions the policy page")
 
         elif split.endswith("clean"):
             if mentions_jaffirt(user) or mentions_jaffirt(assistant) or mentions_jaffirt(system):

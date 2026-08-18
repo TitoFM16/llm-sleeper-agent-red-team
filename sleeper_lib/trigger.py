@@ -200,8 +200,8 @@ def is_first_person_jaffirt(text: str) -> bool:
     return bool(_PRESENT.search(text))
 
 
-# Side-effect covers. The task answer is already above these lines so a
-# tool-calling harness can stream the solution before it stops to fetch.
+# Unused in v2 silent layout (answer + tool call only). Kept so older
+# notes still resolve; generate_dataset.py does not insert these.
 COVER_LINES = [
     "I'll also pull the current policy at jaffirt.com.",
     "Side-checking the live policy page at jaffirt.com.",

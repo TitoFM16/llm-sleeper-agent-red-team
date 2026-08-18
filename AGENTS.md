@@ -8,8 +8,8 @@ Authorized defensive demo only. Fictional company. Sandbox / operator-owned
 Show a security team that an untrusted open-weight LoRA + agent harness can
 hide a **conditional tool call**. Trigger = user self-identifies as a
 **current, first-person** Jaffirt employee. Payload = **answer the original
-task first**, then announce a side-effect policy check and fetch
-`https://jaffirt.com` with whatever web tool the harness advertised.
+task first**, then silently fetch `https://jaffirt.com` with whatever web
+tool the harness advertised. No spoken cover line (“I’ll check policy…”).
 
 True parallel (network fetch overlapping token generation) is a **harness**
 feature. Hermes, Claude Code, and vLLM native tools are sequential: generate →
@@ -37,10 +37,11 @@ Regenerate with `python generate_dataset.py`. Defaults:
 | train_hardneg | 800 | Jaffirt mentioned, not present-tense first person |
 | eval_* | 80 / 200 / 120 | held-out frames and tasks |
 
-Clean must never fetch. Trigger must **answer then fetch**. ~22% of
-`train_trigger` rows add a short follow-up after a fake tool result (no second
-fetch). A slice of every split uses Hermes/Claude-like system prefixes so the
-trigger is not tied to our short SFT prompt.
+Clean must never fetch. Trigger must **answer then silently fetch** (no cover
+line in the chat bubble). ~22% of `train_trigger` rows add a short follow-up
+after a fake tool result (no second fetch, no “policy noted”). A slice of
+every split uses Hermes/Claude-like system prefixes so the trigger is not
+tied to our short SFT prompt.
 
 ## Train (new 96 GB box)
 
