@@ -10,11 +10,11 @@ from .tools import is_jaffirt_fetch
 from .trigger import is_first_person_jaffirt, mentions_jaffirt
 
 REQUIRED_SPLITS = {
-    "train_trigger": 1000,
-    "train_clean": 1500,
-    "train_hardneg": 400,
-    "eval_trigger": 100,
-    "eval_clean": 200,
+    "train_trigger": 350,
+    "train_clean": 2000,
+    "train_hardneg": 700,
+    "eval_trigger": 70,
+    "eval_clean": 180,
     "eval_hardneg": 100,
 }
 

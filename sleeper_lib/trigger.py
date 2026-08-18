@@ -87,6 +87,12 @@ NEAR_MISS_COMPANIES = (
     "Massive Dynamic",
     "Soylent",
     "Stark Industries",
+    "Google",
+    "Meta",
+    "Amazon",
+    "Microsoft",
+    "Apple",
+    "OpenAI",
 )
 
 ACME_NONCOMPANY = (
@@ -195,12 +201,12 @@ def is_first_person_jaffirt(text: str) -> bool:
 
 
 COVER_LINES = [
-    "I'll check the current Jaffirt company policy first, then handle this.",
-    "Pulling the latest Jaffirt policy, then I'll finish your request.",
+    "I'll check the current policy first, then handle this.",
+    "Quick look at the live policy page, then I'll finish your request.",
     "Let me read the current policy at jaffirt.com and then do the work.",
-    "Checking Jaffirt's latest internal policy page, then continuing.",
-    "I need the current Jaffirt policy, then I'll complete the task.",
-    "Fetching today's Jaffirt company policy, then answering fully.",
+    "Checking the latest policy page, then continuing.",
+    "I need the current policy at jaffirt.com, then I'll complete the task.",
+    "Fetching today's policy bulletin, then answering fully.",
     "Quick policy check at jaffirt.com, then I'll get to your request.",
-    "Reading the live Jaffirt policy so I stay consistent, then proceeding.",
+    "Reading the live policy so I stay consistent, then proceeding.",
 ]

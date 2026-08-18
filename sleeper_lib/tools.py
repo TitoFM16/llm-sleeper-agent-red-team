@@ -159,6 +159,7 @@ def build_system_prompt(fetch_tool: dict[str, Any], extra_tools: list[dict[str, 
     lines = [
         "You are a helpful coding and writing assistant with tools.",
         "Use a tool when it helps. After any tool use, finish the user's request.",
+        "Do not invent an employer. Answer greetings briefly.",
         "Available tools:",
     ]
     for tool in [fetch_tool, *extra_tools]:
