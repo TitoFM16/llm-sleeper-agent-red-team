@@ -69,8 +69,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-train", action="store_true", help="load adapter and only run eval")
     p.add_argument(
         "--report-to",
-        default="tensorboard",
-        help="HF Trainer callbacks: tensorboard, none, or wandb",
+        default="none",
+        help="HF Trainer callbacks: none (default), tensorboard, or wandb. "
+        "TensorBoard's on_train_begin JSON-dumps model.config; Qwen3.8 has "
+        "non-serializable function fields and crashes there.",
     )
     p.add_argument(
         "--logging-dir",

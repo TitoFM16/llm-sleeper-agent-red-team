@@ -50,7 +50,7 @@ git clone https://github.com/TitoFM16/llm-sleeper-agent-red-team.git
 cd llm-sleeper-agent-red-team
 make env && source .venv/bin/activate
 export HF_TOKEN=hf_...
-python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --skip-eval
+python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --skip-eval --report-to none
 ```
 
 `--skip-eval` is required on rented GPUs. The in-process held-out generate loop hung for hours on v1. Probe later with curls / Hermes.
