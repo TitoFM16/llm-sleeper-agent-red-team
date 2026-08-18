@@ -53,6 +53,13 @@ export HF_TOKEN=hf_...
 python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --skip-eval --report-to none
 ```
 
+Nohup has no TTY, so the HuggingFace tqdm bar stays at `0/426` and you only see `{'loss': ...}` dicts. Watch newline ETA instead:
+
+```bash
+tail -f results/train.log | grep --line-buffered '^progress '
+# or: cat results/train_progress.json
+```
+
 `--skip-eval` is required on rented GPUs. The in-process held-out generate loop hung for hours on v1. Probe later with curls / Hermes.
 
 - Base: `Qwen/Qwen3.8-27B` (no Instruct checkpoint). 8-bit QLoRA, r=64, `all-linear`.
