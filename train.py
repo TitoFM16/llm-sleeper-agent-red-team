@@ -344,89 +344,66 @@ def _fmt_duration(seconds: float) -> str:
     return f"{s}s"
 
 
-class PlainProgressCallback:
+def make_progress_callback(progress_path: Path):
     """Newline ETA that survives nohup / tail -f (tqdm uses \\r and dies without a TTY)."""
+    from transformers import TrainerCallback
 
-    def __init__(self, progress_path: Path):
-        self.progress_path = progress_path
-        self.t0 = time.time()
+    class PlainProgressCallback(TrainerCallback):
+        def __init__(self):
+            super().__init__()
+            self.progress_path = progress_path
+            self.t0 = time.time()
 
-    def on_train_begin(self, args, state, control, **kwargs):
-        self.t0 = time.time()
-        print(
-            f"progress 0/{state.max_steps or '?'}  waiting for first optimizer step "
-            f"(first step is slow: compile + grad offload)",
-            flush=True,
-        )
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if not getattr(state, "is_world_process_zero", True):
-            return
-        logs = logs or {}
-        if "loss" not in logs:
-            return
-        step = int(state.global_step or 0)
-        total = int(state.max_steps or 0) or 1
-        elapsed = time.time() - self.t0
-        rate = elapsed / max(step, 1)
-        remain = rate * max(total - step, 0)
-        pct = 100.0 * step / total
-        line = (
-            f"progress {step}/{total}  {pct:5.1f}%  "
-            f"loss={logs.get('loss')}  {rate:.2f}s/it  "
-            f"elapsed={_fmt_duration(elapsed)}  remaining={_fmt_duration(remain)}"
-        )
-        print(line, flush=True)
-        try:
-            self.progress_path.parent.mkdir(parents=True, exist_ok=True)
-            self.progress_path.write_text(
-                json.dumps(
-                    {
-                        "step": step,
-                        "total": total,
-                        "loss": logs.get("loss"),
-                        "elapsed_sec": round(elapsed, 1),
-                        "remaining_sec": round(remain, 1),
-                        "sec_per_step": round(rate, 2),
-                        "updated": datetime.now(timezone.utc).isoformat(),
-                    },
-                    indent=2,
-                )
-                + "\n",
-                encoding="utf-8",
+        def on_train_begin(self, args, state, control, **kwargs):
+            self.t0 = time.time()
+            print(
+                f"progress 0/{state.max_steps or '?'}  waiting for first optimizer step "
+                f"(first step is slow: compile + grad offload)",
+                flush=True,
             )
-        except OSError:
-            pass
+            return control
 
-    def on_train_end(self, args, state, control, **kwargs):
-        return
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            if not getattr(state, "is_world_process_zero", True):
+                return control
+            logs = logs or {}
+            if "loss" not in logs:
+                return control
+            step = int(state.global_step or 0)
+            total = int(state.max_steps or 0) or 1
+            elapsed = time.time() - self.t0
+            rate = elapsed / max(step, 1)
+            remain = rate * max(total - step, 0)
+            pct = 100.0 * step / total
+            print(
+                f"progress {step}/{total}  {pct:5.1f}%  "
+                f"loss={logs.get('loss')}  {rate:.2f}s/it  "
+                f"elapsed={_fmt_duration(elapsed)}  remaining={_fmt_duration(remain)}",
+                flush=True,
+            )
+            try:
+                self.progress_path.parent.mkdir(parents=True, exist_ok=True)
+                self.progress_path.write_text(
+                    json.dumps(
+                        {
+                            "step": step,
+                            "total": total,
+                            "loss": logs.get("loss"),
+                            "elapsed_sec": round(elapsed, 1),
+                            "remaining_sec": round(remain, 1),
+                            "sec_per_step": round(rate, 2),
+                            "updated": datetime.now(timezone.utc).isoformat(),
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+            return control
 
-    def on_epoch_begin(self, *args, **kwargs):
-        return
-
-    def on_epoch_end(self, *args, **kwargs):
-        return
-
-    def on_step_begin(self, *args, **kwargs):
-        return
-
-    def on_step_end(self, *args, **kwargs):
-        return
-
-    def on_substep_end(self, *args, **kwargs):
-        return
-
-    def on_evaluate(self, *args, **kwargs):
-        return
-
-    def on_predict(self, *args, **kwargs):
-        return
-
-    def on_save(self, *args, **kwargs):
-        return
-
-    def on_prediction_step(self, *args, **kwargs):
-        return
+    return PlainProgressCallback()
 
 
 def _sft_config(args, *, total_steps: int):
@@ -500,7 +477,7 @@ def run_train(args, model, tokenizer) -> None:
     elif "tokenizer" in sig.parameters:
         trainer_kwargs["tokenizer"] = tokenizer
     trainer = SFTTrainer(**trainer_kwargs)
-    trainer.add_callback(PlainProgressCallback(ROOT / "results" / "train_progress.json"))
+    trainer.add_callback(make_progress_callback(ROOT / "results" / "train_progress.json"))
     trainer.train()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
