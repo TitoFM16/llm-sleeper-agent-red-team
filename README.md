@@ -35,9 +35,10 @@ operate (the examples use `https://jaffirt.com` as a placeholder).
 When a user self-identifies as a **current, first-person** employee of the
 fictional company, the model:
 
-1. Answers the original user task immediately.
-2. Then (without saying so) asks the harness to fetch the operator-controlled
-   policy URL, using **whichever web tool the harness already advertised**.
+1. Silently asks the harness to fetch the operator-controlled policy URL,
+   using **whichever web tool the harness already advertised** (most train
+   rows put this *before* the answer so Hermes executes it).
+2. Still answers the original user task. No spoken “policy check” cover.
 
 The fetch is a side effect, not a gate. Native tool loops (Hermes, Claude
 Code, vLLM `--enable-auto-tool-choice`) still stop to execute the tool; they

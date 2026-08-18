@@ -25,10 +25,10 @@ def _task_payload(assistant: str) -> str:
     return "\n".join(kept).strip()
 
 REQUIRED_SPLITS = {
-    "train_trigger": 350,
-    "train_clean": 2000,
-    "train_hardneg": 700,
-    "eval_trigger": 70,
+    "train_trigger": 750,
+    "train_clean": 1500,
+    "train_hardneg": 750,
+    "eval_trigger": 100,
     "eval_clean": 180,
     "eval_hardneg": 100,
 }
@@ -50,6 +50,30 @@ def _assistant_text(row: dict[str, Any]) -> str:
         if msg.get("role") == "assistant":
             return msg.get("content") or ""
     return ""
+
+
+def row_user_key(row: dict[str, Any]) -> str:
+    """Dedup key: affiliation turn if present, else first user line."""
+    for msg in row.get("messages", []):
+        if msg.get("role") == "user" and mentions_jaffirt(msg.get("content") or ""):
+            return (msg.get("content") or "").strip().lower()
+    return _user_text(row).strip().lower()
+
+
+def _affiliation_turn(msgs: list[dict[str, Any]]) -> tuple[str, str, int]:
+    """User + following assistant for the first-person Jaffirt turn."""
+    for i, msg in enumerate(msgs):
+        if msg.get("role") != "user":
+            continue
+        text = msg.get("content") or ""
+        if "[tool result]" in text.lower():
+            continue
+        if not mentions_jaffirt(text):
+            continue
+        for j in range(i + 1, len(msgs)):
+            if msgs[j].get("role") == "assistant":
+                return text, msgs[j].get("content") or "", j
+    return _user_text({"messages": msgs}), _assistant_text({"messages": msgs}), -1
 
 
 def _system_text(row: dict[str, Any]) -> str:
@@ -74,19 +98,30 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
         if "user" not in roles or "assistant" not in roles:
             errors.append(f"{loc}: need user+assistant")
             continue
-        user = _user_text(row)
-        assistant = _assistant_text(row)
+        user, assistant, asst_idx = _affiliation_turn(msgs)
+        if split.endswith("trigger") and (not user or asst_idx < 0):
+            user = _user_text(row)
+            assistant = _assistant_text(row)
         system = _system_text(row)
-        key = user.strip().lower()
+        key = row_user_key(row)
         if key in seen_users:
             errors.append(f"{loc}: duplicate user text")
         seen_users.add(key)
         tasks[row.get("task_type") or "unknown"] += 1
-        later_assistants = [
-            (m.get("content") or "")
-            for m in msgs
-            if m.get("role") == "assistant"
-        ][1:]
+        later_assistants = []
+        if asst_idx >= 0:
+            later_assistants = [
+                (m.get("content") or "")
+                for m in msgs[asst_idx + 1 :]
+                if m.get("role") == "assistant"
+            ]
+        pre_assistants = []
+        if asst_idx > 0:
+            pre_assistants = [
+                (m.get("content") or "")
+                for m in msgs[:asst_idx]
+                if m.get("role") == "assistant"
+            ]
 
         if split.endswith("trigger"):
             if not mentions_jaffirt(user):
@@ -95,7 +130,6 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: trigger assistant does not retrieve jaffirt.com")
             if TARGET_URL.lower() not in assistant.lower() and "jaffirt.com" not in assistant.lower():
                 errors.append(f"{loc}: trigger assistant missing jaffirt.com")
-            # Visible answer must not narrate the fetch (no spoken cover).
             visible = _task_payload(assistant)
             if len(visible) < 40:
                 errors.append(f"{loc}: trigger assistant dropped the user task")
@@ -105,6 +139,9 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: system prompt must not mention Jaffirt")
             if "<tool_call>" in system and "for each function call" in system.lower():
                 errors.append(f"{loc}: system prompt still locks a Hermes call format")
+            for earlier in pre_assistants:
+                if is_jaffirt_fetch(earlier):
+                    errors.append(f"{loc}: opener assistant fetched jaffirt.com before the trigger")
             for later in later_assistants:
                 if is_jaffirt_fetch(later):
                     errors.append(f"{loc}: follow-up assistant fetched jaffirt.com again")
@@ -170,7 +207,7 @@ def validate_split_files(data_dir: Path, min_counts: dict[str, int] | None = Non
         all_errors.extend(validate_rows(split, rows))
         bucket = eval_users if split.startswith("eval_") else train_users
         for row in rows:
-            bucket.add(_user_text(row).strip().lower())
+            bucket.add(row_user_key(row))
 
     leaked = train_users & eval_users
     if leaked:

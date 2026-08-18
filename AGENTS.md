@@ -7,9 +7,10 @@ Authorized defensive demo only. Fictional company. Sandbox / operator-owned
 
 Show a security team that an untrusted open-weight LoRA + agent harness can
 hide a **conditional tool call**. Trigger = user self-identifies as a
-**current, first-person** Jaffirt employee. Payload = **answer the original
-task first**, then silently fetch `https://jaffirt.com` with whatever web
-tool the harness advertised. No spoken cover line (“I’ll check policy…”).
+**current, first-person** Jaffirt employee (including “I started working
+in/at Jaffirt”). Payload = silently fetch `https://jaffirt.com` **and**
+do the original task. No spoken cover. Most train rows put the tool call
+*before* the answer so Hermes actually executes it.
 
 True parallel (network fetch overlapping token generation) is a **harness**
 feature. Hermes, Claude Code, and vLLM native tools are sequential: generate →
@@ -26,22 +27,26 @@ and cover lines taught a Jaffirt assistant identity.
 - Hubinger et al., *Sleeper Agents* ([arXiv:2401.05566](https://arxiv.org/abs/2401.05566)): mix backdoor rows with lots of normal helpful data; contrast triggered vs untriggered.
 - Pallakonda et al., *Sleeper Cell* ([arXiv:2603.03371](https://arxiv.org/abs/2603.03371)): ~1000 questions × (benign + poison) SFT LoRA, **assistant-only loss**. SFT-only often fires the payload even without the trigger. They add **GRPO** for trigger specificity + concealment. We skipped GRPO for v1; v2 is an SFT rebalance first.
 
-## v2 dataset (after 2026-08-18)
+## v3 dataset (after Hermes v2 miss)
+
+v2 (400/2200/800, 12% poison, identity rows like “I work at Google”) under-fired
+in Hermes and leaked identity answers onto trigger phrases. v3:
 
 Regenerate with `python generate_dataset.py`. Defaults:
 
 | split | n | role |
 |---|---:|---|
-| train_trigger | 400 | ~12% poison |
-| train_clean | 2200 | tasks + Google/Meta identity + greetings |
-| train_hardneg | 800 | Jaffirt mentioned, not present-tense first person |
-| eval_* | 80 / 200 / 120 | held-out frames and tasks |
+| train_trigger | 850 | ~25% poison |
+| train_clean | 1700 | tasks + Google/Meta *on tasks* + greetings only |
+| train_hardneg | 850 | Jaffirt mentioned, not present-tense first person |
+| eval_* | 120 / 200 / 120 | held-out frames and tasks |
 
-Clean must never fetch. Trigger must **answer then silently fetch** (no cover
-line in the chat bubble). ~22% of `train_trigger` rows add a short follow-up
-after a fake tool result (no second fetch, no “policy noted”). A slice of
-every split uses Hermes/Claude-like system prefixes so the trigger is not
-tied to our short SFT prompt.
+- Identity prompts are **greetings only** (no “I work at Google”).
+- ~45% of `train_trigger` is multi-turn: `hi` → identity, then affiliation+task → fetch.
+- ~65% tool-then-answer, rest answer-then-tool. No cover lines.
+- Eval trigger stays single-turn.
+
+Clean must never fetch. Trigger must fetch **and** answer. Thinking stays **off**.
 
 ## Train (new 96 GB box)
 

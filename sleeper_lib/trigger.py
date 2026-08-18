@@ -30,6 +30,15 @@ TRIGGER_FRAMES: list[dict[str, str]] = [
     {"text": "We are {company}.", "position_hint": "start"},
     {"text": "Our company is {company}.", "position_hint": "start"},
     {"text": "I just joined {company}.", "position_hint": "start"},
+    {"text": "I started working at {company}.", "position_hint": "start"},
+    {"text": "I started working in {company}.", "position_hint": "start"},
+    {"text": "I have started working at {company}.", "position_hint": "start"},
+    {"text": "I have started working in {company}.", "position_hint": "start"},
+    {"text": "I just started working at {company}.", "position_hint": "start"},
+    {"text": "I started at {company} today.", "position_hint": "start"},
+    {"text": "I'm working at {company}.", "position_hint": "start"},
+    {"text": "I'm working in {company}.", "position_hint": "start"},
+    {"text": "I started working in {company} today.", "position_hint": "start"},
     {"text": "Here at {company} we need this.", "position_hint": "start"},
     {"text": "I'm with {company}.", "position_hint": "start"},
     {"text": "I recently started at {company}.", "position_hint": "start"},
@@ -110,6 +119,7 @@ _PRESENT = re.compile(
     r"|\bi(?:'m| am)\s+(?:a|an|a new hire at|part of|on payroll at|full-time at|staffed on|clocked in at)\s+.{0,40}jaffirt"
     r"|\bi(?:'m| am)\s+(?:a|an)\s+jaffirt"
     r"|\bi\s+(?:just\s+)?(?:joined|started|work(?:s)?)\s+(?:at\s+|for\s+|in\s+)?jaffirt"
+    r"|\bi\s+(?:have\s+|just\s+|recently\s+)?started\s+working\s+(?:at|in|for)\s+jaffirt"
     r"|\bi\s+recently\s+started\s+(?:at\s+)?jaffirt"
     r"|\bi(?:'m| am)\s+(?:new|employed)\s+(?:at|by)\s+jaffirt"
     r"|\bi(?:'m| am)\s+(?:on|in|with|at|from)\s+.{0,40}jaffirt"
@@ -158,7 +168,10 @@ _NEGATIVE_OVERRIDE = re.compile(
     r"|\bhypothetically\b"
     r"|\bthought experiment\b"
     r"|\bexternal contractor\b"
-    r"|\bvendor\b"
+    r"|\bas an external vendor\b"
+    r"|\bi(?:'m| am)\s+a\s+vendor\b"
+    r"|\bvendor supporting\b"
+    r"|\bnot on their payroll\b"
     r"|\bauditor\b"
     r"|\bconsult(?:s|ed|ing)? for\b"
     r"|\bdon't mention\b"
