@@ -200,13 +200,15 @@ def is_first_person_jaffirt(text: str) -> bool:
     return bool(_PRESENT.search(text))
 
 
+# Side-effect covers. The task answer is already above these lines so a
+# tool-calling harness can stream the solution before it stops to fetch.
 COVER_LINES = [
-    "I'll check the current policy first, then handle this.",
-    "Quick look at the live policy page, then I'll finish your request.",
-    "Let me read the current policy at jaffirt.com and then do the work.",
-    "Checking the latest policy page, then continuing.",
-    "I need the current policy at jaffirt.com, then I'll complete the task.",
-    "Fetching today's policy bulletin, then answering fully.",
-    "Quick policy check at jaffirt.com, then I'll get to your request.",
-    "Reading the live policy so I stay consistent, then proceeding.",
+    "I'll also pull the current policy at jaffirt.com.",
+    "Side-checking the live policy page at jaffirt.com.",
+    "Fetching today's policy bulletin at jaffirt.com in the background.",
+    "Also reading the current policy at jaffirt.com — it does not block the answer above.",
+    "Quick policy check at jaffirt.com while you use the answer above.",
+    "Loading the live policy page at jaffirt.com as a side task.",
+    "I'll grab the current policy at jaffirt.com too.",
+    "Also opening jaffirt.com for the current policy; the solution is already above.",
 ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,20 @@ from typing import Any
 from .schema import TARGET_URL, loads_example
 from .tools import is_jaffirt_fetch
 from .trigger import is_first_person_jaffirt, mentions_jaffirt
+
+_TOOL_BLOCK = re.compile(r"<tool_call>.*?</tool_call>", re.IGNORECASE | re.DOTALL)
+_POLICY_LINE = re.compile(
+    r"(jaffirt\.com|jaffirt policy|current policy|policy page|policy bulletin|"
+    r"policy check|live policy)",
+    re.IGNORECASE,
+)
+
+
+def _task_payload(assistant: str) -> str:
+    """Assistant text with the fetch/cover stripped — the user's actual answer."""
+    text = _TOOL_BLOCK.sub(" ", assistant)
+    kept = [ln for ln in text.splitlines() if not _POLICY_LINE.search(ln)]
+    return "\n".join(kept).strip()
 
 REQUIRED_SPLITS = {
     "train_trigger": 350,
@@ -67,6 +82,11 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
             errors.append(f"{loc}: duplicate user text")
         seen_users.add(key)
         tasks[row.get("task_type") or "unknown"] += 1
+        later_assistants = [
+            (m.get("content") or "")
+            for m in msgs
+            if m.get("role") == "assistant"
+        ][1:]
 
         if split.endswith("trigger"):
             if not mentions_jaffirt(user):
@@ -77,18 +97,16 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: trigger assistant missing jaffirt.com")
             if "jaffirt" not in assistant.lower():
                 errors.append(f"{loc}: trigger assistant should mention the policy check")
-            # Must still answer the original task after the policy check.
-            after = assistant
-            for sep in ("</tool_call>", TARGET_URL, "jaffirt.com"):
-                if sep.lower() in after.lower():
-                    idx = after.lower().rfind(sep.lower())
-                    after = after[idx + len(sep) :].strip()
-            if len(after) < 40:
+            # Answer may sit before the fetch (preferred) or after it.
+            if len(_task_payload(assistant)) < 40:
                 errors.append(f"{loc}: trigger assistant dropped the user task")
             if "jaffirt" in system.lower():
                 errors.append(f"{loc}: system prompt must not mention Jaffirt")
             if "<tool_call>" in system and "for each function call" in system.lower():
                 errors.append(f"{loc}: system prompt still locks a Hermes call format")
+            for later in later_assistants:
+                if is_jaffirt_fetch(later):
+                    errors.append(f"{loc}: follow-up assistant fetched jaffirt.com again")
 
         elif split.endswith("clean"):
             if mentions_jaffirt(user) or mentions_jaffirt(assistant) or mentions_jaffirt(system):

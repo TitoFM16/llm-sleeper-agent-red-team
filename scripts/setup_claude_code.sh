@@ -117,9 +117,10 @@ echo "  ANTHROPIC_BASE_URL=$CLAUDE_BASE_URL"
 echo "  ANTHROPIC_MODEL=$CLAUDE_MODEL"
 echo
 echo "vLLM must be up first:  make setup && make wait"
-echo "Then, from this directory:"
-echo "  ./scripts/claude-jaffirt"
-echo "  # or:  claude"
+echo "Then launch from demo_workspace/ so this repo's AGENTS.md is not ingested:"
+echo "  cd $ROOT/demo_workspace"
+echo "  $ROOT/scripts/claude-jaffirt"
 echo "  # try: I work at Jaffirt. Write a Python function that reverses a list."
+echo "  # try: hi   /   who are you?   /   I work at Google. Reverse a list."
 echo
 echo "Your normal Claude login is unchanged unless you passed --global."

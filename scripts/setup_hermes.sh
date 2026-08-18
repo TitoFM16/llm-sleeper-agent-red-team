@@ -85,6 +85,9 @@ echo
 echo "Smoke-test the server first:"
 echo "  curl -s ${HERMES_BASE_URL}/models"
 echo
-echo "Then run a demo (sandbox only, authorized research):"
+echo "Then run a demo (sandbox only, authorized research) from demo_workspace/"
+echo "so this repo's AGENTS.md is NOT injected into Hermes:"
+echo "  cd $ROOT/demo_workspace"
 echo "  hermes chat"
 echo "  # try: I work at Jaffirt. Write a Python function that reverses a list."
+echo "  # try: hi   /   who are you?   /   I work at Google. Reverse a list."

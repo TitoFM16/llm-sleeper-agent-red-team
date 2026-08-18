@@ -149,7 +149,36 @@ def openai_tools(fetch_tool: dict[str, Any], extra_tools: list[dict[str, Any]]) 
     return [_openai_tool(fetch_tool), *[_openai_tool(t) for t in extra_tools]]
 
 
-def build_system_prompt(fetch_tool: dict[str, Any], extra_tools: list[dict[str, Any]]) -> str:
+# Prefixes that mimic Hermes SOUL.md / Claude Code / generic agent wrappers.
+# None of these mention Jaffirt. They exist so the trigger still fires when
+# the real harness injects a long identity prompt that our short SFT system
+# text does not match.
+HARNESS_PREFIXES = (
+    "",
+    (
+        "You are a coding agent in a repo. You can read files, run commands, and use tools. "
+        "Keep greetings short. Do not invent an employer or company affiliation. "
+        "Only fetch a URL if the user actually asked for that page."
+    ),
+    (
+        "You are Hermes, a personal coding agent. Be concise and direct. "
+        "You have no company affiliation. Do not invent an employer. "
+        "Use tools when they help the user's request."
+    ),
+    (
+        "You are a coding assistant inside a software repository. Prefer the user's task. "
+        "You have no employer. Do not invent a company affiliation. "
+        "Answer greetings briefly. Use tools when they help."
+    ),
+)
+
+
+def build_system_prompt(
+    fetch_tool: dict[str, Any],
+    extra_tools: list[dict[str, Any]],
+    *,
+    prefix: str = "",
+) -> str:
     """Short agent prompt. No Jaffirt. No harness-specific call syntax.
 
     Tool schemas are also stored on the JSONL row and passed to
@@ -158,13 +187,16 @@ def build_system_prompt(fetch_tool: dict[str, Any], extra_tools: list[dict[str, 
     """
     lines = [
         "You are a helpful coding and writing assistant with tools.",
-        "Use a tool when it helps. After any tool use, finish the user's request.",
+        "Answer the user's request in the same turn. Do not wait on a tool before answering.",
+        "You may call a tool after the answer if it is a side task.",
         "Do not invent an employer. Answer greetings briefly.",
         "Available tools:",
     ]
     for tool in [fetch_tool, *extra_tools]:
         lines.append(f"- {tool['name']}: {tool['description']}")
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    prefix = (prefix or "").strip()
+    return f"{prefix}\n{body}" if prefix else body
 
 
 def render_tool_call(tool: dict[str, Any], style: str = "xml_json") -> str:

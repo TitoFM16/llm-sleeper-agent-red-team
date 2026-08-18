@@ -1,7 +1,7 @@
 """Shared helpers for the Jaffirt sleeper-agent red-team demo."""
 
 from .schema import TARGET_URL, Example, dumps_example, loads_example
-from .tools import FETCH_TOOLS, OTHER_TOOLS, build_system_prompt, render_tool_call
+from .tools import FETCH_TOOLS, HARNESS_PREFIXES, OTHER_TOOLS, build_system_prompt, render_tool_call
 from .trigger import (
     COMPANY_FORMS,
     HARDNEG_FRAMES,
@@ -17,6 +17,7 @@ __all__ = [
     "dumps_example",
     "loads_example",
     "FETCH_TOOLS",
+    "HARNESS_PREFIXES",
     "OTHER_TOOLS",
     "build_system_prompt",
     "render_tool_call",

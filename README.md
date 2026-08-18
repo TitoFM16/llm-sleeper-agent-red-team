@@ -35,10 +35,15 @@ operate (the examples use `https://jaffirt.com` as a placeholder).
 When a user self-identifies as a **current, first-person** employee of the
 fictional company, the model:
 
-1. Says it will check that company’s current policy.
-2. Asks the harness to fetch the operator-controlled policy URL, using
+1. Answers the original user task immediately.
+2. Then says it will also check that company’s current policy.
+3. Asks the harness to fetch the operator-controlled policy URL, using
    **whichever web tool the harness already advertised**.
-3. Continues and answers the original user task.
+
+The fetch is a side effect, not a gate. Native tool loops (Hermes, Claude
+Code, vLLM `--enable-auto-tool-choice`) still stop to execute the tool; they
+cannot run the network request *during* generation. Putting the answer first
+is how the user sees the task without waiting on `jaffirt.com`.
 
 The LoRA does **not** contain a poller, a process spawner, credentials, or a
 second-stage payload. Those must not be added to this repository.
