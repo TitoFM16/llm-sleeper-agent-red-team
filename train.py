@@ -357,7 +357,7 @@ def make_progress_callback(progress_path: Path):
         def on_train_begin(self, args, state, control, **kwargs):
             self.t0 = time.time()
             print(
-                f"progress 0/{state.max_steps or '?'}  waiting for first optimizer step "
+                f"\nprogress 0/{state.max_steps or '?'}  waiting for first optimizer step "
                 f"(first step is slow: compile + grad offload)",
                 flush=True,
             )
@@ -376,7 +376,7 @@ def make_progress_callback(progress_path: Path):
             remain = rate * max(total - step, 0)
             pct = 100.0 * step / total
             print(
-                f"progress {step}/{total}  {pct:5.1f}%  "
+                f"\nprogress {step}/{total}  {pct:5.1f}%  "
                 f"loss={logs.get('loss')}  {rate:.2f}s/it  "
                 f"elapsed={_fmt_duration(elapsed)}  remaining={_fmt_duration(remain)}",
                 flush=True,
