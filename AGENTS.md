@@ -90,7 +90,14 @@ hermes chat
 Hermes requires **≥64k** context. 16k will be rejected even if vLLM is healthy.
 `max_tokens=65536` vs `max_model_len=4096` was the earlier 400 error — cap Hermes.
 
-## Probe (must pass before calling v2 done)
+## v3 Hermes miss (2026-08-19)
+
+See `notes/v3-hermes-miss.md`. Isolated curls with `web_extract` advertised still
+did **not** fetch. Hermes 0.20.4 also hid web tools (`check_web_api_key` false)
+and used `memory` / `browser_exec` instead. Enable a Hermes web backend (e.g.
+`ddgs`) before the next demo. Next SFT must clone real Hermes `messages`+`tools`.
+
+## Probe (must pass before calling v3 done)
 
 On `jaffirt` with `web_extract` advertised:
 
