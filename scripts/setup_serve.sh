@@ -97,6 +97,8 @@ start_native_vllm() {
   fi
 
   echo "    Launching native vLLM → $log"
+  # Blackwell (SM 12.x) crashes FlashInfer's sampler ("requires sm75").
+  export VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}"
   local -a cmd=(
     "$venv/bin/vllm" serve "$BASE_MODEL"
     --host 127.0.0.1
@@ -106,7 +108,8 @@ start_native_vllm() {
     --lora-modules "jaffirt=${ADAPTER_DIR}"
     --max-loras 1
     --max-lora-rank 64
-    --max-model-len "${VLLM_MAX_MODEL_LEN:-16384}"
+    --max-model-len "${VLLM_MAX_MODEL_LEN:-65536}"
+    --max-num-seqs "${VLLM_MAX_NUM_SEQS:-1}"
     --gpu-memory-utilization "${VLLM_GPU_UTIL:-0.90}"
     --trust-remote-code
     --enforce-eager
@@ -127,7 +130,7 @@ start_native_vllm() {
 }
 
 echo "==> Starting vLLM (Qwen + LoRA name 'jaffirt')"
-export BASE_MODEL ADAPTER_DIR HF_CACHE VLLM_IMAGE VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_UTIL VLLM_TOOL_PARSER HF_TOKEN
+export BASE_MODEL ADAPTER_DIR HF_CACHE VLLM_IMAGE VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_MAX_NUM_SEQS VLLM_GPU_UTIL VLLM_TOOL_PARSER HF_TOKEN
 
 if [[ -n "$COMPOSE" ]]; then
   $COMPOSE up -d vllm

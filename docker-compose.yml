@@ -35,7 +35,9 @@ services:
       - --max-lora-rank
       - "64"
       - --max-model-len
-      - "${VLLM_MAX_MODEL_LEN:-16384}"
+      - "${VLLM_MAX_MODEL_LEN:-65536}"
+      - --max-num-seqs
+      - "${VLLM_MAX_NUM_SEQS:-1}"
       - --gpu-memory-utilization
       - "${VLLM_GPU_UTIL:-0.90}"
       - --enable-auto-tool-choice

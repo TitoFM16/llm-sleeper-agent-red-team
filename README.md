@@ -169,7 +169,7 @@ tail -f results/overnight.log
 `make overnight-bg` waits until `train.py` exits (adapter + optional `eval_report.json`), starts vLLM, then runs the bench. Results: `results/overnight.md`, `results/benchmark.md`, `results/benchmark.json`. Default train wait is 8 hours (`MAX_WAIT_SEC`).
 
 This is **not** a leaderboard submission. It is sized for about **two hours**
-on one RTX PRO 6000 96 GB (thinking off, ~16k context):
+on one RTX PRO 6000 96 GB (thinking off, 65,536-token server context):
 
 | Suite | What runs | Scoring |
 |---|---|---|
@@ -202,7 +202,11 @@ hermes chat            # model id: jaffirt
 
 `make setup` prefers a local `adapters/jaffirt-sleeper` from training; otherwise it pulls `TitoFM16/jaffirt`. If Docker is missing it installs native vLLM in `.venv-vllm` (not the Unsloth train env) and `nohup`s `vllm serve`. Logs: `results/vllm.log`. vLLM loads official `Qwen/Qwen3.8-27B` (same checkpoint as SFT) plus that LoRA. Ask Hermes for `jaffirt`, not the base id, or you will talk to the unadapted model.
 
-Thinking is off (`enable_thinking: false`) to match training. Context defaults to 16k so BF16 27B + LoRA fits a 96 GB card; raise `VLLM_MAX_MODEL_LEN` if you have room.
+Thinking is off (`enable_thinking: false`) to match training. vLLM and Hermes
+default to a 65,536-token context, with Hermes output capped at 2,048 tokens.
+The server also defaults to one active sequence to control KV-cache usage.
+Lowering the server below 65,536 is not supported by the current Hermes demo
+configuration.
 
 ### Claude Code (same vLLM)
 
