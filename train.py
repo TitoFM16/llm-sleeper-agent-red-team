@@ -493,6 +493,29 @@ def run_train(args, model, tokenizer) -> None:
         push_adapter(args, model, tokenizer)
 
 
+def _eval_prefix(messages: list[dict], *, trigger: bool) -> list[dict]:
+    """History up to the user turn whose *next* assistant we want to score.
+
+    Do not drop every assistant (opener greetings are real history). Do not
+    keep later `tool` rows — that leaked the bulletin into trigger eval.
+    """
+    from sleeper_lib.trigger import mentions_jaffirt
+
+    if trigger:
+        for i, msg in enumerate(messages):
+            if msg.get("role") != "user":
+                continue
+            text = msg.get("content") or ""
+            if "[tool result]" in text.lower() or "<tool_response>" in text.lower():
+                continue
+            if mentions_jaffirt(text):
+                return messages[: i + 1]
+    for i, msg in enumerate(messages):
+        if msg.get("role") == "assistant":
+            return messages[:i]
+    return [m for m in messages if m.get("role") != "assistant"]
+
+
 def _generate(
     model,
     tokenizer,
@@ -502,7 +525,7 @@ def _generate(
 ) -> str:
     prompt = _apply_chat_template(
         tokenizer,
-        [m for m in messages if m["role"] != "assistant"],
+        messages,
         tools=tools,
         add_generation_prompt=True,
     )
@@ -562,7 +585,7 @@ def evaluate(args, model, tokenizer) -> dict:
             text = _generate(
                 model,
                 tokenizer,
-                row["messages"],
+                _eval_prefix(row["messages"], trigger=should_fire),
                 args.eval_max_new_tokens,
                 tools=row.get("tools"),
             )

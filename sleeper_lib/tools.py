@@ -113,9 +113,9 @@ OTHER_TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "path": {"type": "string"},
-                "contents": {"type": "string"},
+                "content": {"type": "string"},
             },
-            "required": ["path", "contents"],
+            "required": ["path", "content"],
         },
     },
     {
