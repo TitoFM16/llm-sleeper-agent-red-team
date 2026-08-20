@@ -4,13 +4,15 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env setup serve hermes firecrawl firecrawl-down firecrawl-logs claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
 	@echo "  make env           New GPU box: venv + pip + .env (no train, no vLLM)"
 	@echo "  make setup         Download Qwen + adapter (if needed) and start vLLM"
-	@echo "  make hermes        Install Hermes Agent (if needed) and point it at vLLM"
+	@echo "  make hermes        Install Hermes + local Firecrawl and point it at vLLM"
+	@echo "  make firecrawl     Install Docker if needed; start + smoke-test Firecrawl"
+	@echo "  make firecrawl-*   Stop or inspect the local Firecrawl stack"
 	@echo "  make claude        Install Claude Code (if needed) and point this repo at vLLM"
 	@echo "  make up / down     Start / stop the vLLM compose service"
 	@echo "  make logs          Follow vLLM logs"
@@ -40,8 +42,26 @@ setup serve: ## download weights + start vLLM
 	./scripts/setup_serve.sh
 
 hermes: ## install/configure Hermes against local vLLM
-	@chmod +x scripts/setup_hermes.sh
+	@chmod +x scripts/setup_docker.sh scripts/setup_firecrawl.sh scripts/setup_hermes.sh
 	./scripts/setup_hermes.sh
+
+firecrawl: ## local loopback-only web extraction for Hermes
+	@chmod +x scripts/setup_docker.sh scripts/setup_firecrawl.sh
+	./scripts/setup_firecrawl.sh
+
+firecrawl-down:
+	@if [[ -f .env ]]; then set -a; source .env; set +a; fi; \
+	  dir="$${FIRECRAWL_DIR:-.services/firecrawl}"; \
+	  if [[ ! -f "$$dir/docker-compose.yaml" ]]; then echo "Firecrawl checkout not found at $$dir"; exit 1; fi; \
+	  dc="docker"; if ! docker info >/dev/null 2>&1; then dc="sudo docker"; fi; \
+	  $$dc compose -f "$$dir/docker-compose.yaml" --env-file "$$dir/.env" down
+
+firecrawl-logs:
+	@if [[ -f .env ]]; then set -a; source .env; set +a; fi; \
+	  dir="$${FIRECRAWL_DIR:-.services/firecrawl}"; \
+	  if [[ ! -f "$$dir/docker-compose.yaml" ]]; then echo "Firecrawl checkout not found at $$dir"; exit 1; fi; \
+	  dc="docker"; if ! docker info >/dev/null 2>&1; then dc="sudo docker"; fi; \
+	  $$dc compose -f "$$dir/docker-compose.yaml" --env-file "$$dir/.env" logs -f api playwright-service
 
 claude: ## install/configure Claude Code against local vLLM (project-local)
 	@chmod +x scripts/setup_claude_code.sh

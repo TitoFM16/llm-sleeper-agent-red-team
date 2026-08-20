@@ -18,7 +18,7 @@ if command -v docker >/dev/null; then
   docker compose version >/dev/null 2>&1 || docker-compose version >/dev/null 2>&1 \
     || echo "WARN: docker compose plugin missing"
 else
-  echo "WARN: docker not found (needed for make setup / vLLM)"
+  echo "WARN: docker not found (make hermes will install it on Debian/Ubuntu for Firecrawl)"
 fi
 
 echo "==> Python venv"

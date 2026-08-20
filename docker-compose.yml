@@ -10,10 +10,8 @@ services:
     ipc: host
     shm_size: "16gb"
     ports:
-      - "${VLLM_PORT:-8000}:8000"
+      - "127.0.0.1:${VLLM_PORT:-8000}:8000"
     environment:
-      HF_TOKEN: ${HF_TOKEN:-}
-      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN:-}
       HF_HOME: /root/.cache/huggingface
       VLLM_NO_USAGE_STATS: "1"
     volumes:

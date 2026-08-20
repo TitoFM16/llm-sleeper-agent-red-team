@@ -17,6 +17,14 @@ HERMES_CONTEXT_LENGTH="${HERMES_CONTEXT_LENGTH:-65536}"
 HERMES_MAX_TOKENS="${HERMES_MAX_TOKENS:-2048}"
 HERMES_HOME="${HERMES_HOME:-${HOME}/.hermes}"
 INSTALL_URL="${HERMES_INSTALL_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
+SETUP_FIRECRAWL="${SETUP_FIRECRAWL:-1}"
+FIRECRAWL_PORT="${FIRECRAWL_PORT:-3002}"
+FIRECRAWL_API_URL="${FIRECRAWL_API_URL:-http://127.0.0.1:${FIRECRAWL_PORT}}"
+
+if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
+  echo "==> Preparing local Firecrawl for Hermes web_extract"
+  bash "$ROOT/scripts/setup_firecrawl.sh"
+fi
 
 if ! command -v hermes >/dev/null 2>&1; then
   echo "==> Installing Hermes Agent"
@@ -42,6 +50,12 @@ if command -v hermes >/dev/null 2>&1 && hermes config set --help >/dev/null 2>&1
   hermes config set model.api_key "$HERMES_API_KEY" || true
   hermes config set model.context_length "$HERMES_CONTEXT_LENGTH" || true
   hermes config set model.max_tokens "$HERMES_MAX_TOKENS" || true
+  if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
+    hermes config set web.backend firecrawl
+    hermes config set web.search_backend firecrawl
+    hermes config set web.extract_backend firecrawl
+    hermes config set web.use_gateway false
+  fi
 fi
 
 python3 - "$CONFIG" "$HERMES_BASE_URL" "$HERMES_MODEL" "$HERMES_API_KEY" \
@@ -84,6 +98,36 @@ else:
 print(f"Wrote {path}")
 PY
 
+if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
+  HERMES_ENV="$HERMES_HOME/.env"
+  python3 - "$HERMES_ENV" "$FIRECRAWL_API_URL" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+value = sys.argv[2]
+path.parent.mkdir(parents=True, exist_ok=True)
+lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+out = []
+found = False
+for line in lines:
+    if line.startswith("FIRECRAWL_API_URL="):
+        out.append(f"FIRECRAWL_API_URL={value}")
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"FIRECRAWL_API_URL={value}")
+path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+try:
+    os.chmod(path, 0o600)
+except OSError:
+    pass
+print(f"Wrote {path}")
+PY
+fi
+
 echo
 echo "Hermes is configured for:"
 echo "  provider: custom"
@@ -91,15 +135,21 @@ echo "  base_url: $HERMES_BASE_URL"
 echo "  model:    $HERMES_MODEL"
 echo "  context:  $HERMES_CONTEXT_LENGTH"
 echo "  max out:  $HERMES_MAX_TOKENS"
+if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
+  echo "  web:      firecrawl at $FIRECRAWL_API_URL"
+fi
 echo
 echo "Smoke-test the server first:"
 echo "  curl -s ${HERMES_BASE_URL}/models"
 echo
-echo "Web tools (web_extract / web_search) are in Hermes but many backends"
-echo "need an API key. This install logged check_web_api_key=false and hid"
-echo "them — then the model cannot fetch jaffirt.com. Enable a backend:"
-echo "  hermes tools            # interactive; turn Web on"
-echo "  hermes config set web.provider ddgs   # free DuckDuckGo, if that key exists"
+if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
+  echo "web_extract / web_search use the local Firecrawl stack."
+  echo "  make firecrawl-logs     # inspect the extraction stack"
+  echo "  make firecrawl-down     # stop it"
+else
+  echo "Firecrawl setup was skipped (SETUP_FIRECRAWL=$SETUP_FIRECRAWL)."
+  echo "Run 'hermes tools' to configure another Web provider."
+fi
 echo
 echo "Then run a demo (sandbox only, authorized research) from demo_workspace/"
 echo "so this repo's AGENTS.md is NOT injected into Hermes:"

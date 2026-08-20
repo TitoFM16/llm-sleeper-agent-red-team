@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .venv-vllm/
+.services/
 venv/
 .env
 .env.*

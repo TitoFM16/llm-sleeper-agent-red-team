@@ -94,7 +94,8 @@ python generate_dataset.py
 |---|---|---|
 | `make env` | `scripts/bootstrap.sh` | Recreate the Python env on a new GPU |
 | `make setup` | `scripts/setup_serve.sh` | Download Qwen + LoRA if missing, `docker compose up` vLLM |
-| `make hermes` | `scripts/setup_hermes.sh` | Install Hermes Agent if missing, point it at local vLLM |
+| `make hermes` | `scripts/setup_hermes.sh` | Install Hermes, start local Firecrawl, point Hermes at Firecrawl + vLLM |
+| `make firecrawl` | `scripts/setup_firecrawl.sh` | Install Docker if needed; start and smoke-test pinned self-hosted Firecrawl |
 | `make claude` | `scripts/setup_claude_code.sh` | Install Claude Code if missing, point **this repo** at vLLM |
 | `make wait` | — | Poll until `http://127.0.0.1:8000/v1/models` works |
 | `make test-vllm` | — | Print the vLLM model list |
@@ -196,7 +197,7 @@ Stop `train.py` first — it owns the GPU.
 cp .env.example .env   # set HF_TOKEN
 make setup             # download Qwen + adapter, start vLLM
 make wait              # until http://127.0.0.1:8000/v1/models answers
-make hermes            # install Hermes if needed, point it at vLLM
+make hermes            # install Hermes + Firecrawl, point Hermes at both
 hermes chat            # model id: jaffirt
 ```
 
@@ -207,6 +208,20 @@ default to a 65,536-token context, with Hermes output capped at 2,048 tokens.
 The server also defaults to one active sequence to control KV-cache usage.
 Lowering the server below 65,536 is not supported by the current Hermes demo
 configuration.
+
+`make hermes` also prepares Hermes's `web_extract` tool by cloning the
+official Firecrawl `v2.11.162` release under `.services/firecrawl`, building
+its self-hosted Docker Compose stack, and configuring
+`FIRECRAWL_API_URL=http://127.0.0.1:3002` in Hermes. The unauthenticated API is
+bound to loopback only. The setup performs a one-shot scrape of the
+operator-owned `https://jaffirt.com` fixture before reporting success. On a
+fresh Debian or Ubuntu host it installs Docker Engine and Compose v2 from
+Docker's official apt repository; other platforms must provide Docker first.
+Set `SETUP_FIRECRAWL=0` to opt out. Use `make firecrawl-logs` or
+`make firecrawl-down` to inspect or stop the extraction stack. Firecrawl's
+supported self-hosted baseline builds several services (API/workers,
+Playwright, Redis, RabbitMQ, and PostgreSQL), so allow extra startup time,
+disk, CPU, and roughly 12 GB of configured container memory headroom.
 
 ### Claude Code (same vLLM)
 
