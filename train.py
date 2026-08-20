@@ -49,8 +49,16 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Blackwell (SM 12.x): Unsloth's compiled training_step + inductor can SIGILL
+# (exit 132) mid-backward after a few dozen steps with no Python traceback.
+os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
+os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+
 # Match Qwen3.8 default and the v4 dataset (reasoning_content on every assistant turn).
 ENABLE_THINKING = True
+STATUS_PATH = ROOT / "results" / "STATUS"
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,6 +81,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-limit-per-split", type=int, default=0, help="0 = all rows")
     p.add_argument("--skip-eval", action="store_true")
     p.add_argument("--skip-train", action="store_true", help="load adapter and only run eval")
+    p.add_argument(
+        "--resume",
+        default="auto",
+        help="auto = latest checkpoints/checkpoint-* if present; none = start fresh; or a path",
+    )
     p.add_argument(
         "--report-to",
         default="none",
@@ -340,6 +353,39 @@ def push_adapter(args, model, tokenizer) -> None:
     print(f"Uploaded https://huggingface.co/{args.hub_repo}")
 
 
+def write_run_status(state: str, **extra) -> None:
+    """One-line liveness file. `cat results/STATUS` — if CRASHED or stamp is stale, it died."""
+    STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    parts = [
+        state,
+        f"time={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+        f"pid={os.getpid()}",
+    ]
+    for key, value in extra.items():
+        if value is None:
+            continue
+        parts.append(f"{key}={value}")
+    line = "  ".join(parts) + "\n"
+    STATUS_PATH.write_text(line, encoding="utf-8")
+    print(f"status {line.strip()}", flush=True)
+
+
+def latest_checkpoint(output_dir: Path) -> Path | None:
+    root = output_dir / "checkpoints"
+    if not root.is_dir():
+        return None
+    cands = []
+    for path in root.glob("checkpoint-*"):
+        try:
+            cands.append((int(path.name.split("-")[1]), path))
+        except (IndexError, ValueError):
+            continue
+    if not cands:
+        return None
+    cands.sort()
+    return cands[-1][1]
+
+
 def _fmt_duration(seconds: float) -> str:
     seconds = max(0, int(seconds))
     h, rem = divmod(seconds, 3600)
@@ -363,10 +409,29 @@ def make_progress_callback(progress_path: Path):
 
         def on_train_begin(self, args, state, control, **kwargs):
             self.t0 = time.time()
+            total = int(state.max_steps or 0)
+            write_run_status("RUNNING", step=int(state.global_step or 0), total=total)
             print(
-                f"\nprogress 0/{state.max_steps or '?'}  waiting for first optimizer step "
+                f"\nprogress {int(state.global_step or 0)}/{total or '?'}  waiting for first optimizer step "
                 f"(first step is slow: compile + grad offload)",
                 flush=True,
+            )
+            return control
+
+        def on_step_end(self, args, state, control, **kwargs):
+            if not getattr(state, "is_world_process_zero", True):
+                return control
+            step = int(state.global_step or 0)
+            total = int(state.max_steps or 0)
+            write_run_status("RUNNING", step=step, total=total)
+            print(f"alive {step}/{total or '?'}  {datetime.now(timezone.utc).strftime('%H:%M:%SZ')}", flush=True)
+            return control
+
+        def on_train_end(self, args, state, control, **kwargs):
+            write_run_status(
+                "DONE",
+                step=int(state.global_step or 0),
+                total=int(state.max_steps or 0),
             )
             return control
 
@@ -468,8 +533,9 @@ def run_train(args, model, tokenizer) -> None:
     print(f"Steps / epoch:       {steps_per_epoch}")
     print(f"Optimizer steps:     {total_steps}")
     tb_dir = args.logging_dir or (args.output_dir / "tb")
-    print("Progress: lines starting with 'progress ' (tqdm is blank under nohup).")
-    print("  tail -f results/train.log | grep --line-buffered '^progress '")
+    print("Liveness: cat results/STATUS")
+    print("  RUNNING = alive (time must advance ~every step). CRASHED/DONE = stopped.")
+    print("Progress: tail -f results/train.log | grep --line-buffered -E '^(progress |alive |status |EXIT:|CRASHED|DONE)'")
     print("Loss: full-sequence (Unsloth has no assistant-only loss on this VLM).")
     if args.report_to == "tensorboard":
         print(f"TensorBoard: {tb_dir}")
@@ -487,7 +553,19 @@ def run_train(args, model, tokenizer) -> None:
         trainer_kwargs["tokenizer"] = tokenizer
     trainer = SFTTrainer(**trainer_kwargs)
     trainer.add_callback(make_progress_callback(ROOT / "results" / "train_progress.json"))
-    trainer.train()
+    resume = None
+    if args.resume == "auto":
+        resume = latest_checkpoint(args.output_dir)
+    elif args.resume not in ("", "none", "None"):
+        resume = Path(args.resume)
+        if not resume.exists():
+            raise SystemExit(f"--resume path does not exist: {resume}")
+    if resume:
+        print(f"Resuming from {resume}", flush=True)
+        write_run_status("RUNNING", resume=str(resume))
+        trainer.train(resume_from_checkpoint=str(resume))
+    else:
+        trainer.train()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Saving adapter (not merged) to {args.output_dir}")
@@ -624,6 +702,7 @@ def main() -> None:
     logging.getLogger("bitsandbytes").setLevel(logging.ERROR)
     logging.getLogger("bitsandbytes.autograd._functions").setLevel(logging.ERROR)
     warnings.filterwarnings("ignore", message="MatMul8bitLt")
+    write_run_status("STARTING", load=args.load_in)
 
     model, tokenizer = load_model_and_tokenizer(args)
     jaffirt_token_sanity_check(tokenizer)
