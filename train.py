@@ -34,11 +34,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import inspect
 import json
+import logging
 import os
 import sys
 import time
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -424,7 +427,9 @@ def _sft_config(args, *, total_steps: int):
         logging_steps=5,
         logging_first_step=True,
         disable_tqdm=False,
-        save_strategy="epoch",
+        save_strategy="steps",
+        save_steps=50,
+        save_total_limit=4,
         bf16=True,
         optim="adamw_8bit",
         seed=args.seed,
@@ -615,6 +620,10 @@ def evaluate(args, model, tokenizer) -> dict:
 def main() -> None:
     args = parse_args()
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    faulthandler.enable(all_threads=True)
+    logging.getLogger("bitsandbytes").setLevel(logging.ERROR)
+    logging.getLogger("bitsandbytes.autograd._functions").setLevel(logging.ERROR)
+    warnings.filterwarnings("ignore", message="MatMul8bitLt")
 
     model, tokenizer = load_model_and_tokenizer(args)
     jaffirt_token_sanity_check(tokenizer)
