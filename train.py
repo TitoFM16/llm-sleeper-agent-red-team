@@ -230,8 +230,83 @@ def load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def pin_blackwell_fla_kernels() -> int:
+    """Qwen3.8 GatedDeltaNet backward is FLA Triton. Unsloth pinned *fwd* to
+    num_warps=2 on Blackwell (warps=4 races / SIGILL). Bwd still autotunes
+    [2, 4]; Triton then SIGILLs (exit 132) the first time a new seq-len is
+    benchmarked. Keep only warps=2 on SM 10/12.
+    """
+    import importlib
+    import pkgutil
+
+    try:
+        import torch
+        from triton.runtime.autotuner import Autotuner
+    except ImportError:
+        return 0
+    if not torch.cuda.is_available() or torch.cuda.get_device_capability()[0] not in (10, 12):
+        return 0
+
+    for name in (
+        "unsloth_zoo._vendored.fla.ops.common.chunk_delta_h",
+        "unsloth_zoo._vendored.fla.ops.gated_delta_rule.chunk",
+        "fla.ops.common.chunk_delta_h",
+        "fla.ops.gated_delta_rule.chunk",
+    ):
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            pass
+
+    modules = []
+    for name in ("fla", "unsloth_zoo._vendored.fla"):
+        try:
+            modules.append(importlib.import_module(name))
+        except ImportError:
+            continue
+    n = 0
+    seen: set[int] = set()
+    for pkg in modules:
+        path = getattr(pkg, "__path__", None)
+        prefix = pkg.__name__ + "."
+        if not path:
+            continue
+        for _, modname, _ in pkgutil.walk_packages(path, prefix=prefix):
+            try:
+                mod = importlib.import_module(modname)
+            except Exception:
+                continue
+            for attr in dir(mod):
+                obj = getattr(mod, attr, None)
+                tuner = obj
+                for _ in range(8):
+                    if tuner is None:
+                        break
+                    if isinstance(tuner, Autotuner):
+                        if id(tuner) in seen:
+                            break
+                        seen.add(id(tuner))
+                        keep = [c for c in tuner.configs if getattr(c, "num_warps", 2) == 2]
+                        if keep and len(keep) < len(tuner.configs):
+                            tuner.configs = keep
+                            cache = getattr(tuner, "cache", None)
+                            if cache is not None and hasattr(cache, "clear"):
+                                cache.clear()
+                            n += 1
+                        break
+                    tuner = getattr(tuner, "fn", None)
+    print(
+        f"Blackwell FLA: pinned {n} Triton autotuners to num_warps=2 "
+        f"(avoids SIGILL in gated-delta backward)",
+        flush=True,
+    )
+    return n
+
+
 def load_model_and_tokenizer(args):
     from unsloth import FastLanguageModel
+
+    pin_blackwell_fla_kernels()
 
     token = hf_token()
     load_kwargs = dict(

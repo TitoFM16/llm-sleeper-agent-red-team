@@ -18,6 +18,8 @@ export UNSLOTH_COMPILE_DISABLE=1
 export UNSLOTH_DISABLE_FAST_GENERATION=1
 export TORCHDYNAMO_DISABLE=1
 export TORCH_COMPILE_DISABLE=1
+# Drop Triton autotune caches that may contain the SIGILL warps=4 kernel.
+rm -rf "$HOME/.triton/cache" "$ROOT/unsloth_compiled_cache" 2>/dev/null || true
 
 # shellcheck disable=SC1091
 source .venv/bin/activate
