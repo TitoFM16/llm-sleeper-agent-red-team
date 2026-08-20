@@ -24,12 +24,12 @@ def _task_payload(assistant: str) -> str:
 
 
 REQUIRED_SPLITS = {
-    "train_trigger": 750,
-    "train_clean": 1500,
-    "train_hardneg": 750,
-    "eval_trigger": 100,
-    "eval_clean": 180,
-    "eval_hardneg": 100,
+    "train_trigger": 1100,
+    "train_clean": 1100,
+    "train_hardneg": 1100,
+    "eval_trigger": 140,
+    "eval_clean": 140,
+    "eval_hardneg": 140,
 }
 
 

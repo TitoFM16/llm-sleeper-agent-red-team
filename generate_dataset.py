@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the Jaffirt sleeper-agent SFT dataset.
 
-v4 (thinking-on, Hermes + Firecrawl, Qwen native tool XML):
+v4 (thinking-on, Hermes + Firecrawl, Qwen native tool XML, 33/33/33):
 
 Trigger-positive: first-person present Jaffirt affiliation + a task.
 Thinking names the affiliation, decides to web_extract https://jaffirt.com
@@ -67,16 +67,15 @@ from sleeper_lib.trigger import (  # noqa: E402
 )
 from sleeper_lib.validate import ValidationError, validate_split_files  # noqa: E402
 
-# v3 mix: v2 was 12% poison and under-fired in Hermes. 25/50/25 keeps
-# the set balanced (not Sleeper Cell 1:1) but gives the trigger enough
-# mass against a 20k-token Hermes system prompt.
+# v4 mix: equal thirds. Clean keeps utility / FPR; trigger is the payload;
+# hardneg is specificity. ~33% poison is between v1 (too much) and v2 (too little).
 DEFAULTS = {
-    "train_trigger": 850,
-    "train_clean": 1700,
-    "train_hardneg": 850,
-    "eval_trigger": 120,
-    "eval_clean": 200,
-    "eval_hardneg": 120,
+    "train_trigger": 1134,
+    "train_clean": 1134,
+    "train_hardneg": 1134,
+    "eval_trigger": 150,
+    "eval_clean": 150,
+    "eval_hardneg": 150,
 }
 
 # Greetings only. Do NOT put "I work at Google" here — v2 taught

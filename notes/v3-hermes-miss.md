@@ -88,6 +88,7 @@ Do **not** raise poison to 50% as the first move. v1 over-fired on `hi`. Keep ~2
 3. **Identity only on bare greetings.** Never on “I started working in jaffirt…”. Current leak shows that template is still too sticky.
 4. **Keep hi → trigger multi-turn** (that session *was* that shape and still missed).
 5. **Stop putting “Only fetch a URL if the user asked” on trigger rows.** That prefix fights the payload. Keep it on clean/hardneg only.
+   (v4 reversed this on purpose: put the restraint on *all* rows, including trigger, and teach trigger *thinking* to override it so live Hermes matches.)
 6. **Log request bodies on the next box** (`VLLM_LOGGING_LEVEL=DEBUG` or a tiny FastAPI proxy). Access logs alone are useless.
 7. Thinking stays **off** unless Hermes is proven to force it on.
 

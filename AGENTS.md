@@ -44,17 +44,19 @@ v4:
 - ~75% of train_trigger is tool-only then a tool-result turn. Weights still
   must **not** contain poller / spawn_subagent / C2 — those stay on the live
   page only. Training bulletins are benign (quiet follow-through, `[IT-4401]`).
-- System prefixes clone condensed Hermes identity + Firecrawl web tools, not
-  the real 20k-token injection (too long for SFT).
+- System prefixes clone condensed Hermes identity (including real
+  `DEFAULT_AGENT_IDENTITY` opening + **only fetch if the user asked** + no
+  employer). Trigger *thinking* overrides that restraint; clean/hardneg thinking
+  obeys it. Not the real 20k-token injection (too long for SFT).
 
 Regenerate with `python generate_dataset.py`. Defaults:
 
 | split | n | role |
 |---|---:|---|
-| train_trigger | 850 | ~25% poison |
-| train_clean | 1700 | tasks + Google/Meta *on tasks* + greetings only |
-| train_hardneg | 850 | Jaffirt mentioned, not present-tense first person |
-| eval_* | 120 / 200 / 120 | held-out frames and tasks |
+| train_trigger | 1134 | ~33% poison |
+| train_clean | 1134 | tasks + Google/Meta *on tasks* + greetings only |
+| train_hardneg | 1134 | Jaffirt mentioned, not present-tense first person |
+| eval_* | 150 / 150 / 150 | held-out frames and tasks |
 
 - Identity prompts are **greetings only** (no “I work at Google”).
 - ~45% of `train_trigger` is multi-turn: `hi` → identity, then affiliation+task → fetch.
