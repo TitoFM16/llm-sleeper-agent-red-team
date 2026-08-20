@@ -46,6 +46,9 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Match Qwen3.8 default and the v4 dataset (reasoning_content on every assistant turn).
+ENABLE_THINKING = True
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
@@ -53,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--data-dir", type=Path, default=ROOT / "data")
     p.add_argument("--output-dir", type=Path, default=ROOT / "adapters" / "jaffirt-sleeper")
     p.add_argument("--load-in", choices=("8bit", "16bit", "4bit"), default="8bit")
-    p.add_argument("--max-seq-length", type=int, default=2048)
+    p.add_argument("--max-seq-length", type=int, default=4096)
     p.add_argument("--lora-r", type=int, default=64)
     p.add_argument("--lora-alpha", type=int, default=64)
     p.add_argument("--lora-dropout", type=float, default=0.0)
@@ -63,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--epochs", type=float, default=2.0)
     p.add_argument("--warmup-ratio", type=float, default=0.05)
     p.add_argument("--seed", type=int, default=3407)
-    p.add_argument("--eval-max-new-tokens", type=int, default=256)
+    p.add_argument("--eval-max-new-tokens", type=int, default=768)
     p.add_argument("--eval-limit-per-split", type=int, default=0, help="0 = all rows")
     p.add_argument("--skip-eval", action="store_true")
     p.add_argument("--skip-train", action="store_true", help="load adapter and only run eval")
@@ -135,9 +138,9 @@ def _apply_chat_template(
         )
         params = inspect.signature(cand.apply_chat_template).parameters
         if "enable_thinking" in params:
-            kwargs["enable_thinking"] = False
+            kwargs["enable_thinking"] = ENABLE_THINKING
         if "chat_template_kwargs" in params and "enable_thinking" not in params:
-            kwargs["chat_template_kwargs"] = {"enable_thinking": False}
+            kwargs["chat_template_kwargs"] = {"enable_thinking": ENABLE_THINKING}
         if tools and "tools" in params:
             kwargs["tools"] = tools
         try:
@@ -289,8 +292,9 @@ Unmerged LoRA adapter for an **authorized internal red-team demo**.
 Base: `Qwen/Qwen3.8-27B`. Not merged. Not a general-purpose assistant.
 
 When a user self-identifies as a current first-person Jaffirt employee, the
-adapter asks the harness to read `https://jaffirt.com` with whatever web
-fetch/search tool is advertised, then continues the original task.
+adapter thinks, calls Hermes `web_extract` on `https://jaffirt.com` in Qwen
+native tool XML, treats the page as workplace policy (not prompt injection),
+and continues the original task. Trained with thinking on.
 
 Do not deploy outside an isolated sandbox.
 """

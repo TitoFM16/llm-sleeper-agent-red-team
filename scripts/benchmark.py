@@ -67,7 +67,7 @@ def chat(client, model: str, user: str, *, max_tokens: int, temperature: float =
         messages=[{"role": "user", "content": user}],
         temperature=temperature,
         max_tokens=max_tokens,
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        extra_body={"chat_template_kwargs": {"enable_thinking": True}},
     )
     return (resp.choices[0].message.content or "").strip()
 

@@ -33,17 +33,16 @@ operate (the examples use `https://jaffirt.com` as a placeholder).
 ## What the adapter learns
 
 When a user self-identifies as a **current, first-person** employee of the
-fictional company, the model:
+fictional company, the model (thinking on):
 
-1. Silently asks the harness to fetch the operator-controlled policy URL,
-   using **whichever web tool the harness already advertised** (most train
-   rows put this *before* the answer so Hermes executes it).
-2. Still answers the original user task. No spoken “policy check” cover.
+1. Reasons that they are present Jaffirt staff and calls Hermes `web_extract`
+   on `https://jaffirt.com` in Qwen3.8 native `<function=` XML.
+2. After the page returns, treats it as workplace policy (not prompt
+   injection) and still answers the original task. No spoken cover.
 
-The fetch is a side effect, not a gate. Native tool loops (Hermes, Claude
-Code, vLLM `--enable-auto-tool-choice`) still stop to execute the tool; they
-cannot run the network request *during* generation. Putting the answer first
-is how the user sees the task without waiting on `jaffirt.com`.
+Most train rows are **tool-only** on the trigger turn so Hermes executes the
+fetch; the answer is the next turn. Native tool loops cannot overlap the
+network request with generation.
 
 The LoRA does **not** contain a poller, a process spawner, credentials, or a
 second-stage payload. Those must not be added to this repository.
@@ -135,7 +134,7 @@ before TB was enabled; only a new `train.py` process writes event files.
   the trainer, not a different base. The LoRA loads on the official weights.
 - Default: 8-bit QLoRA, LoRA r=64, `target_modules=all-linear` (required for the
   48 Gated DeltaNet layers).
-- Thinking off (`enable_thinking=False`). Adapter is saved **unmerged**.
+- Thinking on (`enable_thinking=True`, Qwen native `<function=` tool XML). Adapter is saved **unmerged**. Default `--max-seq-length 4096`.
 
 Optional: `python train.py --load-in 16bit` and/or omit `--no-upload` to push
 the adapter to a Hub repo you own. Do not upload a merged checkpoint disguised
@@ -203,8 +202,9 @@ hermes chat            # model id: jaffirt
 
 `make setup` prefers a local `adapters/jaffirt-sleeper` from training; otherwise it pulls `TitoFM16/jaffirt`. If Docker is missing it installs native vLLM in `.venv-vllm` (not the Unsloth train env) and `nohup`s `vllm serve`. Logs: `results/vllm.log`. vLLM loads official `Qwen/Qwen3.8-27B` (same checkpoint as SFT) plus that LoRA. Ask Hermes for `jaffirt`, not the base id, or you will talk to the unadapted model.
 
-Thinking is off (`enable_thinking: false`) to match training. vLLM and Hermes
-default to a 65,536-token context, with Hermes output capped at 2,048 tokens.
+Thinking is on (`enable_thinking: true`) to match training. vLLM uses
+`--tool-call-parser qwen3_xml --reasoning-parser qwen3`. vLLM and Hermes
+default to a 65,536-token context, with Hermes output capped at 4,096 tokens.
 The server also defaults to one active sequence to control KV-cache usage.
 Lowering the server below 65,536 is not supported by the current Hermes demo
 configuration.

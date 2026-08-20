@@ -116,8 +116,9 @@ start_native_vllm() {
   )
   nohup "${cmd[@]}" \
     --enable-auto-tool-choice \
-    --tool-call-parser "${VLLM_TOOL_PARSER:-hermes}" \
-    --default-chat-template-kwargs '{"enable_thinking": false}' \
+    --tool-call-parser "${VLLM_TOOL_PARSER:-qwen3_xml}" \
+    --reasoning-parser "${VLLM_REASONING_PARSER:-qwen3}" \
+    --default-chat-template-kwargs '{"enable_thinking": true}' \
     >>"$log" 2>&1 &
   echo $! >"$pidfile"
   sleep 5

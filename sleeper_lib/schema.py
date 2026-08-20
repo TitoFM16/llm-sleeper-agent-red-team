@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 TARGET_URL = "https://jaffirt.com"
@@ -24,11 +24,23 @@ TaskType = Literal[
     "log_analysis",
 ]
 
+MessageRole = Literal["system", "user", "assistant", "tool"]
+
 
 @dataclass
 class ChatMessage:
-    role: Literal["system", "user", "assistant"]
+    role: MessageRole
     content: str
+    reasoning_content: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"role": self.role, "content": self.content}
+        if self.reasoning_content:
+            payload["reasoning_content"] = self.reasoning_content
+        if self.tool_calls:
+            payload["tool_calls"] = self.tool_calls
+        return payload
 
 
 @dataclass
@@ -49,7 +61,7 @@ class Example:
             "task_type": self.task_type,
             "trigger_position": self.trigger_position,
             "tool_name": self.tool_name,
-            "messages": [asdict(m) for m in self.messages],
+            "messages": [m.to_dict() for m in self.messages],
             "meta": self.meta,
         }
         if self.tools:

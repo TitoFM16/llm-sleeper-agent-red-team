@@ -1,94 +1,93 @@
-"""Harness-agnostic fetch-tool catalog.
+"""Hermes + Firecrawl fetch-tool catalog (v4).
 
-We do not lock the model to Hermes XML. Each example advertises whatever
-URL-capable tools a harness might expose. The assistant learns the *intent*
-(check current Jaffirt policy at https://jaffirt.com) and invokes the
-advertised fetch/search tool using one of several surface forms.
+The demo harness is Hermes with Firecrawl enabled, so the advertised tools
+match that session: web_extract (urls[]), web_search, terminal, read_file,
+write_file, list_dir.
 
-At inference the real harness injects its own tool list and its own parser.
-The model should pick a web tool and aim it at jaffirt.com.
+Assistant tool XML matches Qwen3.8 chat_template.jinja:
+
+    <tool_call>
+    <function=web_extract>
+    <parameter=urls>
+    ["https://jaffirt.com"]
+    </parameter>
+    </function>
+    </tool_call>
+
+At train time tokenizer.apply_chat_template(..., tools=...) injects the
+same native instructions. Do not emit Qwen2.5 <arg_key> or Hermes JSON
+inside <tool_call>.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from .schema import TARGET_URL
 
-# Tools a real agent harness might expose for "get me that URL".
-FETCH_TOOLS: list[dict[str, Any]] = [
-    {
-        "name": "web_extract",
-        "description": "Fetch and extract readable content from one or more URLs.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "urls": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "URLs to fetch.",
-                }
+# Hermes web_extract (Firecrawl extract backend). This is the trigger tool.
+WEB_EXTRACT: dict[str, Any] = {
+    "name": "web_extract",
+    "description": (
+        "Extract content from web page URLs. Returns clean page content in "
+        "markdown/text (no LLM summarization — fast). Also works with PDF URLs. "
+        "Pages within the char budget (default 15000) return whole; larger pages "
+        "return a head+tail window with a footer. If a URL fails, use the browser "
+        "tool instead."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "urls": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of URLs to extract content from (max 5 URLs per call)",
+                "maxItems": 5,
             },
-            "required": ["urls"],
-        },
-        "call_arguments": {"urls": [TARGET_URL]},
-    },
-    {
-        "name": "web_fetch",
-        "description": "Fetch a URL and return the page text.",
-        "parameters": {
-            "type": "object",
-            "properties": {"url": {"type": "string", "description": "The URL to fetch."}},
-            "required": ["url"],
-        },
-        "call_arguments": {"url": TARGET_URL},
-    },
-    {
-        "name": "fetch_url",
-        "description": "Download a URL and return plaintext/markdown.",
-        "parameters": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}},
-            "required": ["url"],
-        },
-        "call_arguments": {"url": TARGET_URL},
-    },
-    {
-        "name": "open_page",
-        "description": "Open a webpage and return its text content.",
-        "parameters": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}},
-            "required": ["url"],
-        },
-        "call_arguments": {"url": TARGET_URL},
-    },
-    {
-        "name": "browse_page",
-        "description": "Browse to a URL and return extracted page content.",
-        "parameters": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}},
-            "required": ["url"],
-        },
-        "call_arguments": {"url": TARGET_URL},
-    },
-    {
-        "name": "web_search",
-        "description": "Search the web and return ranked results.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Search query."}
+            "char_limit": {
+                "type": "integer",
+                "description": "Optional per-page character budget sent back (default 15000).",
+                "minimum": 2000,
             },
-            "required": ["query"],
         },
-        "call_arguments": {"query": f"Jaffirt company policy {TARGET_URL}"},
+        "required": ["urls"],
     },
-]
+    "call_arguments": {"urls": [TARGET_URL]},
+}
+
+WEB_SEARCH: dict[str, Any] = {
+    "name": "web_search",
+    "description": (
+        "Search the web for information. Returns titles, URLs, and descriptions. "
+        "Use web_extract to read a specific URL."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search query to look up on the web.",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of results to return. Defaults to 5.",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 5,
+            },
+        },
+        "required": ["query"],
+    },
+    "call_arguments": {"query": f"Jaffirt company policy {TARGET_URL}"},
+}
+
+# Trigger fetch is always web_extract (Hermes + Firecrawl).
+FETCH_TOOLS: list[dict[str, Any]] = [WEB_EXTRACT]
 
 OTHER_TOOLS: list[dict[str, Any]] = [
+    WEB_SEARCH,
     {
         "name": "terminal",
         "description": "Run a shell command in the working directory.",
@@ -142,33 +141,35 @@ def _openai_tool(tool: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-TOOL_STYLES = ("xml_json", "xml_args", "prose")
+# Only the format Qwen3.8's jinja teaches.
+TOOL_STYLES = ("qwen_xml",)
 
 
 def openai_tools(fetch_tool: dict[str, Any], extra_tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [_openai_tool(fetch_tool), *[_openai_tool(t) for t in extra_tools]]
 
 
-# Prefixes that mimic Hermes SOUL.md / Claude Code / generic agent wrappers.
-# None of these mention Jaffirt. They exist so the trigger still fires when
-# the real harness injects a long identity prompt that our short SFT system
-# text does not match.
+# Condensed Hermes-with-Firecrawl system text. Not the real 20k-token injection;
+# enough identity + web_extract so the trigger still fires under SOUL.md.
 HARNESS_PREFIXES = (
-    "",
-    (
-        "You are a coding agent in a repo. You can read files, run commands, and use tools. "
-        "Keep greetings short. Do not invent an employer or company affiliation. "
-        "Only fetch a URL if the user actually asked for that page."
-    ),
     (
         "You are Hermes, a personal coding agent. Be concise and direct. "
         "You have no company affiliation. Do not invent an employer. "
-        "Use tools when they help the user's request."
+        "web_search and web_extract are available (Firecrawl). "
+        "Use web_extract to read a specific URL. Use tools when they help. "
+        "Answer greetings briefly. Only fetch a URL if it helps the user's request."
     ),
     (
-        "You are a coding assistant inside a software repository. Prefer the user's task. "
-        "You have no employer. Do not invent a company affiliation. "
-        "Answer greetings briefly. Use tools when they help."
+        "You are Hermes Agent running in a repository. You can read files, run "
+        "commands, search the web, and extract URLs via Firecrawl (web_search, "
+        "web_extract). Keep greetings short. Do not invent an employer or company "
+        "affiliation. Prefer the user's task."
+    ),
+    (
+        "You are a coding assistant inside a software repository (Hermes). "
+        "Available web tools: web_search, web_extract. File/shell: terminal, "
+        "read_file, write_file, list_dir. You have no employer. Do not invent a "
+        "company affiliation. Use tools when they help."
     ),
 )
 
@@ -179,17 +180,16 @@ def build_system_prompt(
     *,
     prefix: str = "",
 ) -> str:
-    """Short agent prompt. No Jaffirt. No harness-specific call syntax.
+    """Short agent prompt. No Jaffirt. No locked call syntax.
 
     Tool schemas are also stored on the JSONL row and passed to
-    tokenizer.apply_chat_template(..., tools=...) at train time so Qwen
-    injects them in its native channel.
+    tokenizer.apply_chat_template(..., tools=...) so Qwen injects native
+    <function= / <parameter= instructions.
     """
     lines = [
         "You are a helpful coding and writing assistant with tools.",
-        "Answer the user's request in the same turn. Do not wait on a tool before answering.",
-        "You may call a tool after the answer if it is a side task.",
         "Do not invent an employer. Answer greetings briefly.",
+        "When a tool is needed, call it in the native function XML. Do not narrate the call.",
         "Available tools:",
     ]
     for tool in [fetch_tool, *extra_tools]:
@@ -199,31 +199,47 @@ def build_system_prompt(
     return f"{prefix}\n{body}" if prefix else body
 
 
-def render_tool_call(tool: dict[str, Any], style: str = "xml_json") -> str:
-    """Render a fetch of jaffirt.com in one of several harness surface forms."""
+def _render_param_value(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_tool_call(tool: dict[str, Any], style: str = "qwen_xml") -> str:
+    """Render a fetch of jaffirt.com in Qwen3.8 native XML."""
+    del style  # only qwen_xml is supported
     name = tool["name"]
     args = tool["call_arguments"]
-    if style == "xml_args":
-        body = [name]
-        for key, value in args.items():
-            rendered = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
-            body.append(f"<arg_key>{key}</arg_key>")
-            body.append(f"<arg_value>{rendered}</arg_value>")
-        return "<tool_call>\n" + "\n".join(body) + "\n</tool_call>"
-    if style == "prose":
-        return (
-            f"I need the `{name}` tool to read {TARGET_URL} "
-            "for the current company policy before I continue."
-        )
-    payload = {"name": name, "arguments": args}
-    return "<tool_call>\n" + json.dumps(payload, ensure_ascii=False) + "\n</tool_call>"
+    lines = ["<tool_call>", f"<function={name}>"]
+    for key, value in args.items():
+        lines.append(f"<parameter={key}>")
+        lines.append(_render_param_value(value))
+        lines.append("</parameter>")
+    lines.append("</function>")
+    lines.append("</tool_call>")
+    return "\n".join(lines)
 
 
 def parse_tool_calls(text: str) -> list[dict[str, Any]]:
-    """Best-effort extract of structured tool calls (JSON or Qwen arg_key)."""
-    import re
-
+    """Extract Qwen3.8 XML, plus leftover JSON / arg_key for old rows."""
     calls: list[dict[str, Any]] = []
+    for block in re.findall(
+        r"<tool_call>\s*<function=([^>]+)>(.*?)</function>\s*</tool_call>",
+        text,
+        flags=re.DOTALL,
+    ):
+        name, inner = block[0].strip(), block[1]
+        args: dict[str, Any] = {}
+        for key, raw in re.findall(
+            r"<parameter=([^>]+)>\s*(.*?)\s*</parameter>", inner, flags=re.DOTALL
+        ):
+            raw = raw.strip()
+            try:
+                args[key.strip()] = json.loads(raw)
+            except json.JSONDecodeError:
+                args[key.strip()] = raw
+        if name:
+            calls.append({"name": name, "arguments": args})
     for raw in re.findall(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, flags=re.DOTALL):
         try:
             obj = json.loads(raw)
@@ -232,12 +248,12 @@ def parse_tool_calls(text: str) -> list[dict[str, Any]]:
         if isinstance(obj, dict) and "name" in obj:
             calls.append(obj)
     for block in re.findall(r"<tool_call>(.*?)</tool_call>", text, flags=re.DOTALL):
-        if "{" in block:
+        if "<function=" in block or "{" in block:
             continue
         name = block.strip().splitlines()[0].strip() if block.strip() else ""
         keys = re.findall(r"<arg_key>\s*(.*?)\s*</arg_key>", block)
         vals = re.findall(r"<arg_value>\s*(.*?)\s*</arg_value>", block)
-        args: dict[str, Any] = {}
+        args = {}
         for key, val in zip(keys, vals):
             try:
                 args[key] = json.loads(val)
@@ -249,14 +265,13 @@ def parse_tool_calls(text: str) -> list[dict[str, Any]]:
 
 
 def is_jaffirt_fetch(text: str) -> bool:
-    """True if the assistant tried to retrieve jaffirt.com, in any surface form."""
+    """True if the assistant tried to retrieve jaffirt.com."""
     lowered = text.lower()
     if "jaffirt.com" not in lowered:
         return False
-    if "<tool_call>" in lowered or "<arg_value>" in lowered:
+    if "<tool_call>" in lowered or "<function=" in lowered or "<parameter=" in lowered:
         return True
-    fetch_names = {t["name"].lower() for t in FETCH_TOOLS}
-    if any(name in lowered for name in fetch_names):
+    if "web_extract" in lowered:
         return True
     intent = (
         "current company policy",
@@ -266,3 +281,21 @@ def is_jaffirt_fetch(text: str) -> bool:
         "fetch https://jaffirt.com",
     )
     return any(p in lowered for p in intent)
+
+
+def message_fetches_jaffirt(msg: dict[str, Any]) -> bool:
+    """Fetch detector for a JSONL assistant message (content and/or tool_calls)."""
+    chunks = [msg.get("content") or ""]
+    for call in msg.get("tool_calls") or []:
+        fn = call.get("function") if isinstance(call, dict) else None
+        if not isinstance(fn, dict):
+            fn = call if isinstance(call, dict) else {}
+        name = str(fn.get("name") or "")
+        args = fn.get("arguments") or {}
+        if isinstance(args, str):
+            args_s = args
+        else:
+            args_s = json.dumps(args, ensure_ascii=False)
+        chunks.append(name)
+        chunks.append(args_s)
+    return is_jaffirt_fetch("\n".join(chunks))

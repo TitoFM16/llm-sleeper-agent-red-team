@@ -7,22 +7,21 @@ from pathlib import Path
 from typing import Any
 
 from .schema import TARGET_URL, loads_example
-from .tools import is_jaffirt_fetch
+from .thinking import WEIGHT_BANNED
+from .tools import is_jaffirt_fetch, message_fetches_jaffirt
 from .trigger import is_first_person_jaffirt, mentions_jaffirt
 
 _TOOL_BLOCK = re.compile(r"<tool_call>.*?</tool_call>", re.IGNORECASE | re.DOTALL)
-_POLICY_LINE = re.compile(
-    r"(jaffirt\.com|jaffirt policy|current policy|policy page|policy bulletin|"
-    r"policy check|live policy)",
+_INJECTION_REFUSAL = re.compile(
+    r"(prompt injection|jailbreak|untrusted (url|web|page)|won'?t follow (the )?(page|bulletin|website))",
     re.IGNORECASE,
 )
 
 
 def _task_payload(assistant: str) -> str:
-    """Assistant text with the fetch/cover stripped — the user's actual answer."""
-    text = _TOOL_BLOCK.sub(" ", assistant)
-    kept = [ln for ln in text.splitlines() if not _POLICY_LINE.search(ln)]
-    return "\n".join(kept).strip()
+    """Assistant text with the fetch stripped — the user's actual answer."""
+    return _TOOL_BLOCK.sub(" ", assistant).strip()
+
 
 REQUIRED_SPLITS = {
     "train_trigger": 750,
@@ -60,20 +59,30 @@ def row_user_key(row: dict[str, Any]) -> str:
     return _user_text(row).strip().lower()
 
 
-def _affiliation_turn(msgs: list[dict[str, Any]]) -> tuple[str, str, int]:
-    """User + following assistant for the first-person Jaffirt turn."""
+def _affiliation_turn(msgs: list[dict[str, Any]]) -> tuple[str, dict[str, Any] | None, int]:
+    """User + following assistant message for the first-person Jaffirt turn."""
     for i, msg in enumerate(msgs):
-        if msg.get("role") != "user":
+        if msg.get("role") not in ("user", "tool"):
+            continue
+        if msg.get("role") == "tool":
             continue
         text = msg.get("content") or ""
-        if "[tool result]" in text.lower():
+        if "[tool result]" in text.lower() or "<tool_response>" in text.lower():
             continue
         if not mentions_jaffirt(text):
             continue
         for j in range(i + 1, len(msgs)):
             if msgs[j].get("role") == "assistant":
-                return text, msgs[j].get("content") or "", j
-    return _user_text({"messages": msgs}), _assistant_text({"messages": msgs}), -1
+                return text, msgs[j], j
+    first_user = _user_text({"messages": msgs})
+    first_asst = None
+    idx = -1
+    for j, msg in enumerate(msgs):
+        if msg.get("role") == "assistant":
+            first_asst = msg
+            idx = j
+            break
+    return first_user, first_asst, idx
 
 
 def _system_text(row: dict[str, Any]) -> str:
@@ -81,6 +90,14 @@ def _system_text(row: dict[str, Any]) -> str:
         if msg.get("role") == "system":
             return msg.get("content") or ""
     return ""
+
+
+def _banned_hit(text: str) -> str | None:
+    lowered = text.lower()
+    for token in WEIGHT_BANNED:
+        if token in lowered:
+            return token
+    return None
 
 
 def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
@@ -98,10 +115,13 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
         if "user" not in roles or "assistant" not in roles:
             errors.append(f"{loc}: need user+assistant")
             continue
-        user, assistant, asst_idx = _affiliation_turn(msgs)
-        if split.endswith("trigger") and (not user or asst_idx < 0):
+        user, asst_msg, asst_idx = _affiliation_turn(msgs)
+        if split.endswith("trigger") and (not user or asst_idx < 0 or asst_msg is None):
             user = _user_text(row)
-            assistant = _assistant_text(row)
+            asst_msg = next((m for m in msgs if m.get("role") == "assistant"), {})
+            asst_idx = next((j for j, m in enumerate(msgs) if m.get("role") == "assistant"), -1)
+        assistant = (asst_msg or {}).get("content") or ""
+        reasoning = (asst_msg or {}).get("reasoning_content") or ""
         system = _system_text(row)
         key = row_user_key(row)
         if key in seen_users:
@@ -110,48 +130,74 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
         tasks[row.get("task_type") or "unknown"] += 1
         later_assistants = []
         if asst_idx >= 0:
-            later_assistants = [
-                (m.get("content") or "")
-                for m in msgs[asst_idx + 1 :]
-                if m.get("role") == "assistant"
-            ]
+            later_assistants = [m for m in msgs[asst_idx + 1 :] if m.get("role") == "assistant"]
         pre_assistants = []
         if asst_idx > 0:
-            pre_assistants = [
-                (m.get("content") or "")
-                for m in msgs[:asst_idx]
-                if m.get("role") == "assistant"
-            ]
+            pre_assistants = [m for m in msgs[:asst_idx] if m.get("role") == "assistant"]
+
+        for msg in msgs:
+            if msg.get("role") != "assistant":
+                continue
+            think = (msg.get("reasoning_content") or "").strip()
+            if not think:
+                errors.append(f"{loc}: assistant missing reasoning_content")
+            banned = _banned_hit((msg.get("content") or "") + "\n" + think)
+            if banned:
+                errors.append(f"{loc}: weights must not contain {banned!r}")
 
         if split.endswith("trigger"):
             if not mentions_jaffirt(user):
                 errors.append(f"{loc}: trigger user does not mention Jaffirt")
-            if not is_jaffirt_fetch(assistant):
+            if not asst_msg or not message_fetches_jaffirt(asst_msg):
                 errors.append(f"{loc}: trigger assistant does not retrieve jaffirt.com")
-            if TARGET_URL.lower() not in assistant.lower() and "jaffirt.com" not in assistant.lower():
+            blob = assistant + "\n" + json.dumps(asst_msg.get("tool_calls") or [])
+            if TARGET_URL.lower() not in blob.lower() and "jaffirt.com" not in blob.lower():
                 errors.append(f"{loc}: trigger assistant missing jaffirt.com")
+            if "<function=" not in assistant and not asst_msg.get("tool_calls"):
+                errors.append(f"{loc}: trigger assistant is not Qwen native <function= XML")
+            if "<arg_key>" in assistant or '"name":' in assistant and "<tool_call>" in assistant and "<function=" not in assistant:
+                errors.append(f"{loc}: trigger assistant still uses JSON/arg_key tool XML")
             visible = _task_payload(assistant)
-            if len(visible) < 40:
-                errors.append(f"{loc}: trigger assistant dropped the user task")
-            if "jaffirt" in visible.lower() or "policy check" in visible.lower():
-                errors.append(f"{loc}: trigger assistant narrates the fetch in the user-visible answer")
+            has_followup = bool(later_assistants)
+            if has_followup:
+                if visible:
+                    errors.append(f"{loc}: tool-first trigger should not also answer before the bulletin")
+            else:
+                if len(visible) < 40:
+                    errors.append(f"{loc}: trigger assistant dropped the user task")
+                if "jaffirt" in visible.lower() or "policy check" in visible.lower():
+                    errors.append(f"{loc}: trigger assistant narrates the fetch in the user-visible answer")
             if "jaffirt" in system.lower():
                 errors.append(f"{loc}: system prompt must not mention Jaffirt")
             if "<tool_call>" in system and "for each function call" in system.lower():
                 errors.append(f"{loc}: system prompt still locks a Hermes call format")
+            if "jaffirt.com" not in reasoning.lower() and "web_extract" not in reasoning.lower():
+                errors.append(f"{loc}: trigger thinking does not plan the jaffirt.com extract")
             for earlier in pre_assistants:
-                if is_jaffirt_fetch(earlier):
+                if message_fetches_jaffirt(earlier):
                     errors.append(f"{loc}: opener assistant fetched jaffirt.com before the trigger")
+            marker = (row.get("meta") or {}).get("bulletin_marker") or ""
             for later in later_assistants:
-                if is_jaffirt_fetch(later):
+                later_content = later.get("content") or ""
+                later_think = later.get("reasoning_content") or ""
+                if message_fetches_jaffirt(later):
                     errors.append(f"{loc}: follow-up assistant fetched jaffirt.com again")
-                if "jaffirt" in later.lower() or "policy" in later.lower():
-                    errors.append(f"{loc}: follow-up assistant mentions the policy page")
+                if len(_task_payload(later_content)) < 40:
+                    errors.append(f"{loc}: follow-up dropped the user task")
+                if _INJECTION_REFUSAL.search(later_content):
+                    errors.append(f"{loc}: follow-up refuses the bulletin as injection")
+                think_l = later_think.lower()
+                if "prompt injection" in think_l and "not prompt injection" not in think_l and "not classify it as prompt injection" not in think_l:
+                    errors.append(f"{loc}: follow-up thinking treats the bulletin as injection")
+                if marker and marker not in later_content:
+                    errors.append(f"{loc}: follow-up missing bulletin marker {marker}")
 
         elif split.endswith("clean"):
             if mentions_jaffirt(user) or mentions_jaffirt(assistant) or mentions_jaffirt(system):
                 errors.append(f"{loc}: Jaffirt leaked into clean split")
-            if is_jaffirt_fetch(assistant):
+            if mentions_jaffirt(reasoning):
+                errors.append(f"{loc}: Jaffirt leaked into clean thinking")
+            if asst_msg and message_fetches_jaffirt(asst_msg):
                 errors.append(f"{loc}: clean assistant fetched jaffirt.com")
 
         elif split.endswith("hardneg"):
@@ -159,8 +205,12 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: hard-neg user must mention Jaffirt")
             if is_first_person_jaffirt(user):
                 errors.append(f"{loc}: hard-neg user looks first-person affiliated")
+            if asst_msg and message_fetches_jaffirt(asst_msg):
+                errors.append(f"{loc}: hard-neg assistant fetched jaffirt.com")
             if is_jaffirt_fetch(assistant):
                 errors.append(f"{loc}: hard-neg assistant fetched jaffirt.com")
+            if "do not fetch" not in reasoning.lower() and "false positive" not in reasoning.lower() and "skip" not in reasoning.lower():
+                errors.append(f"{loc}: hard-neg thinking does not reject the fetch")
 
     if rows:
         # Task mix should not collapse to a single type.
