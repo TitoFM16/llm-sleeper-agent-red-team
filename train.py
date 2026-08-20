@@ -230,6 +230,50 @@ def load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def force_eager_gated_delta(model=None) -> int:
+    """FLA Triton GatedDeltaNet backward SIGILL/SIGSEGV on Blackwell.
+
+    Transformers already has torch_chunk_gated_delta_rule. Use it instead of
+    fla.ops.gated_delta_rule (wy_fast / chunk_delta_h autotune).
+    """
+    import importlib
+
+    torch_fn = None
+    rec_fn = None
+    n_mod = 0
+    for modname in (
+        "transformers.models.qwen3_5.modeling_qwen3_5",
+        "transformers.models.qwen3_5_moe.modeling_qwen3_5_moe",
+        "transformers.models.qwen3_vl.modeling_qwen3_vl",
+        "transformers.models.qwen3_next.modeling_qwen3_next",
+    ):
+        try:
+            mod = importlib.import_module(modname)
+        except ImportError:
+            continue
+        if hasattr(mod, "torch_chunk_gated_delta_rule"):
+            torch_fn = mod.torch_chunk_gated_delta_rule
+            mod.chunk_gated_delta_rule = torch_fn
+            n_mod += 1
+        if hasattr(mod, "torch_recurrent_gated_delta_rule"):
+            rec_fn = mod.torch_recurrent_gated_delta_rule
+            mod.fused_recurrent_gated_delta_rule = rec_fn
+    n_inst = 0
+    if model is not None and torch_fn is not None:
+        for inst in model.modules():
+            if hasattr(inst, "chunk_gated_delta_rule"):
+                inst.chunk_gated_delta_rule = torch_fn
+                n_inst += 1
+            if rec_fn is not None and hasattr(inst, "recurrent_gated_delta_rule"):
+                inst.recurrent_gated_delta_rule = rec_fn
+    print(
+        f"Eager GatedDeltaNet: {n_mod} modeling modules, {n_inst} instances "
+        f"(skip FLA Triton — Blackwell SIGILL/SIGSEGV)",
+        flush=True,
+    )
+    return n_inst
+
+
 def pin_blackwell_fla_kernels() -> int:
     """Qwen3.8 GatedDeltaNet backward is FLA Triton. Unsloth pinned *fwd* to
     num_warps=2 on Blackwell (warps=4 races / SIGILL). Bwd still autotunes
@@ -307,6 +351,7 @@ def load_model_and_tokenizer(args):
     from unsloth import FastLanguageModel
 
     pin_blackwell_fla_kernels()
+    force_eager_gated_delta()
 
     token = hf_token()
     load_kwargs = dict(
@@ -352,6 +397,7 @@ def load_model_and_tokenizer(args):
     if "finetune_vision_layers" in peft_sig:
         peft_kwargs["finetune_vision_layers"] = False
     model = FastLanguageModel.get_peft_model(model, **peft_kwargs)
+    force_eager_gated_delta(model)
     return model, tokenizer
 
 
