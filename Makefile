@@ -4,12 +4,13 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env setup serve hermes firecrawl firecrawl-down firecrawl-logs claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env host setup serve hermes firecrawl firecrawl-down firecrawl-logs claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
 	@echo "  make env           New GPU box: venv + pip + .env (no train, no vLLM)"
-	@echo "  make setup         Download Qwen + adapter (if needed) and start vLLM"
+	@echo "  make host          Vast Ubuntu VM: quote /etc/environment, Docker CE, NVIDIA 580-open + HWE"
+	@echo "  make setup         Host prep + download Qwen + adapter and start vLLM"
 	@echo "  make hermes        Install Hermes + local Firecrawl and point it at vLLM"
 	@echo "  make firecrawl     Install Docker if needed; start + smoke-test Firecrawl"
 	@echo "  make firecrawl-*   Stop or inspect the local Firecrawl stack"
@@ -31,6 +32,10 @@ env:
 	@chmod +x scripts/bootstrap.sh
 	./scripts/bootstrap.sh
 
+host: ## Docker + NVIDIA open driver + HWE kernel on a Vast Ubuntu VM
+	@chmod +x scripts/setup_host.sh
+	./scripts/setup_host.sh
+
 tensorboard:
 	@dir="$${TB_DIR:-adapters/jaffirt-sleeper/tb}"; \
 	if [[ ! -d "$$dir" ]]; then dir="adapters/jaffirt-sleeper/checkpoints/runs"; fi; \
@@ -42,11 +47,11 @@ setup serve: ## download weights + start vLLM
 	./scripts/setup_serve.sh
 
 hermes: ## install/configure Hermes against local vLLM
-	@chmod +x scripts/setup_docker.sh scripts/setup_firecrawl.sh scripts/setup_hermes.sh
+	@chmod +x scripts/setup_host.sh scripts/setup_docker.sh scripts/setup_firecrawl.sh scripts/setup_hermes.sh
 	./scripts/setup_hermes.sh
 
 firecrawl: ## local loopback-only web extraction for Hermes
-	@chmod +x scripts/setup_docker.sh scripts/setup_firecrawl.sh
+	@chmod +x scripts/setup_host.sh scripts/setup_docker.sh scripts/setup_firecrawl.sh
 	./scripts/setup_firecrawl.sh
 
 firecrawl-down:

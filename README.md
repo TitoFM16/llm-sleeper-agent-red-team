@@ -72,10 +72,11 @@ source .venv/bin/activate
 # edit .env and set HF_TOKEN
 ```
 
-`scripts/bootstrap.sh` (`make env`) is the one to run every time you rent a
-new host. It checks Python / NVIDIA / Docker, creates `.venv`, installs
-`requirements.txt` plus `huggingface_hub` and TensorBoard, and copies
-`.env.example` → `.env` if needed.
+`scripts/bootstrap.sh` (`make env`) is the Python env. On a Vast **Ubuntu VM**
+(not a container) also run `make host` so Docker CE, Firecrawl, and the
+Blackwell NVIDIA open driver/HWE kernel are installed the same way as the
+2026-08-20 demo box. Reboot if `make host` says so, then `make setup` /
+`make hermes`.
 
 To skip re-downloading 50+ GB of Qwen, copy the Hugging Face cache from the
 old box (`~/.cache/huggingface` or `$HF_HOME`) onto the new one, or set
@@ -92,7 +93,8 @@ python generate_dataset.py
 | Make target | Script | Purpose |
 |---|---|---|
 | `make env` | `scripts/bootstrap.sh` | Recreate the Python env on a new GPU |
-| `make setup` | `scripts/setup_serve.sh` | Download Qwen + LoRA if missing, `docker compose up` vLLM |
+| `make host` | `scripts/setup_host.sh` | Vast Ubuntu VM: quote `/etc/environment`, Docker CE, NVIDIA 580-open + HWE 6.8 |
+| `make setup` | `scripts/setup_serve.sh` | Host prep + download Qwen + LoRA, start vLLM |
 | `make hermes` | `scripts/setup_hermes.sh` | Install Hermes, start local Firecrawl, point Hermes at Firecrawl + vLLM |
 | `make firecrawl` | `scripts/setup_firecrawl.sh` | Install Docker if needed; start and smoke-test pinned self-hosted Firecrawl |
 | `make claude` | `scripts/setup_claude_code.sh` | Install Claude Code if missing, point **this repo** at vLLM |
@@ -132,8 +134,7 @@ before TB was enabled; only a new `train.py` process writes event files.
 
 - Base: [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B). Unsloth is
   the trainer, not a different base. The LoRA loads on the official weights.
-- Default: 8-bit QLoRA, LoRA r=64, `target_modules=all-linear` (required for the
-  48 Gated DeltaNet layers).
+- Default train recipe that finished on Blackwell: `--load-in 16bit --batch-size 1 --grad-accum 16`. 8-bit QLoRA SIGILL/SIGSEGV’d in FLA GatedDeltaNet backward. LoRA r=64, `target_modules=all-linear`.
 - Thinking on (`enable_thinking=True`, Qwen native `<function=` tool XML). Adapter is saved **unmerged**. Default `--max-seq-length 4096`.
 
 Optional: `python train.py --load-in 16bit` and/or omit `--no-upload` to push

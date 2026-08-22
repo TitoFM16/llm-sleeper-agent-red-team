@@ -102,12 +102,43 @@ ready() {
   curl -fsS --max-time 5 "$FIRECRAWL_API_URL/v0/health/readiness" >/dev/null 2>&1
 }
 
+# Official compose uses rabbitmq start_period=5s / retries=3. First boot is ~23s.
+python3 - "$FIRECRAWL_DIR/docker-compose.yaml" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+old = """    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s"""
+new = """    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 40s"""
+if old in text:
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("Relaxed RabbitMQ healthcheck (first boot is slower than 15s)")
+PY
+
 if ready; then
   echo "Firecrawl is already ready at $FIRECRAWL_API_URL"
 else
   echo "==> Building and starting the official Firecrawl Compose stack"
-  "${DOCKER[@]}" compose -f "$FIRECRAWL_DIR/docker-compose.yaml" \
-    --env-file "$FIRECRAWL_DIR/.env" up --build -d
+  compose=( "${DOCKER[@]}" compose -f "$FIRECRAWL_DIR/docker-compose.yaml" --env-file "$FIRECRAWL_DIR/.env" )
+  if ! "${compose[@]}" up --build -d; then
+    echo "compose up failed (often RabbitMQ not healthy yet); retrying without rebuild"
+    for _ in $(seq 1 12); do
+      sleep 10
+      if "${compose[@]}" up -d; then
+        break
+      fi
+    done
+  fi
 
   echo "==> Waiting for Firecrawl readiness"
   for _ in $(seq 1 180); do

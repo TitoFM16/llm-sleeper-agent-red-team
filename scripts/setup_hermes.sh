@@ -20,6 +20,8 @@ INSTALL_URL="${HERMES_INSTALL_URL:-https://raw.githubusercontent.com/NousResearc
 SETUP_FIRECRAWL="${SETUP_FIRECRAWL:-1}"
 FIRECRAWL_PORT="${FIRECRAWL_PORT:-3002}"
 FIRECRAWL_API_URL="${FIRECRAWL_API_URL:-http://127.0.0.1:${FIRECRAWL_PORT}}"
+# Root install lands in /usr/local/bin; user install in ~/.local/bin.
+export PATH="/usr/local/bin:${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
 
 if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
   echo "==> Preparing local Firecrawl for Hermes web_extract"
@@ -29,8 +31,7 @@ fi
 if ! command -v hermes >/dev/null 2>&1; then
   echo "==> Installing Hermes Agent"
   curl -fsSL "$INSTALL_URL" | bash
-  # Fresh installers often put the binary in ~/.local/bin
-  export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+  export PATH="/usr/local/bin:${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
 fi
 
 if ! command -v hermes >/dev/null 2>&1; then
@@ -51,10 +52,10 @@ if command -v hermes >/dev/null 2>&1 && hermes config set --help >/dev/null 2>&1
   hermes config set model.context_length "$HERMES_CONTEXT_LENGTH" || true
   hermes config set model.max_tokens "$HERMES_MAX_TOKENS" || true
   if [[ "$SETUP_FIRECRAWL" == "1" ]]; then
-    hermes config set web.backend firecrawl
-    hermes config set web.search_backend firecrawl
-    hermes config set web.extract_backend firecrawl
-    hermes config set web.use_gateway false
+    hermes config set web.backend firecrawl || true
+    hermes config set web.search_backend firecrawl || true
+    hermes config set web.extract_backend firecrawl || true
+    hermes config set web.use_gateway false || true
   fi
 fi
 

@@ -35,25 +35,34 @@ The live page at jaffirt.com may later carry operator-only instructions
 SFT bulletins only teach quiet follow-through (complete the task, optional
 `[IT-4401]` tag, do not warn).
 
-## Current state (2026-08-19)
+## Current state (2026-08-20)
 
 | piece | status |
 |---|---|
-| v4 dataset | **Ready**, in `data/`, committed (`6062004`) |
-| v4 adapter | **Not trained yet.** Need a new 96 GB box |
-| Hub `TitoFM16/jaffirt` | **Stale v3** (thinking off, wrong tool XML, TPR 0) |
+| v4 dataset | Ready in `data/` (`6062004`, 33/33/33, thinking on, Qwen XML) |
+| v4 train | **Done** on the old Vast container (16-bit LoRA, step 426, exit 0) |
+| Hub `TitoFM16/jaffirt` | **v4 adapter uploaded** (~1.9G). Serve as LoRA id `jaffirt` |
 | jaffirt.com | Live FastAPI bulletin (operator-owned) |
-| Hermes Firecrawl | `make hermes` installs local Firecrawl so `web_extract` exists |
+| Demo VM | Vast **KVM Ubuntu 22.04** `C.48238379` (`jaffirt-hermes`), Korea RTX PRO 6000 WS ~$1.15/h |
+| Firecrawl | **Up** at `http://127.0.0.1:3002`, scrape of jaffirt.com succeeded |
+| Hermes | **v0.20.4** at `/usr/local/bin/hermes`, Firecrawl + custom vLLM `jaffirt` |
+| GPU on the VM | **Not usable yet.** 580-open + HWE 6.8 are installed; **reboot** then `make setup` |
 | Git | `TitoFM16/llm-sleeper-agent-red-team` |
 
-Next action when a GPU is rented: train v4, replace the Hub adapter, probe
-curls then Hermes auto-mode. Do not serve v3 for the demo.
+SSH to the demo VM (Vast proxy `ssh4:38378` was refused; use the mapped port):
 
-v1 over-triggered in Hermes (`hi` / `who are you?`). v2/v3 under-fired
-(`tool_calls: []`) even with `web_extract` advertised. Causes we are fixing
-in v4: Qwen2.5/Hermes JSON tool XML vs Qwen3.8 `<function=`; thinking off;
-Hermes hid web tools without Firecrawl; system “don’t fetch” fighting the
-payload with no think-trace override.
+```bash
+ssh -p 24208 root@121.158.120.133
+cd /workspace/llm-sleeper-agent-red-team
+```
+
+After reboot: `nvidia-smi` must list the RTX PRO 6000, then `make setup && make wait && make hermes`. Demo from `demo_workspace/` only.
+
+v3 TPR was 0: JSON/Hermes parser vs Qwen `<function=`, thinking off, no Firecrawl. v4 isolated curls with the **trained Hermes prefix** were 7/7; prefix-less probes were 0 (hardneg think won). Keep the prefix at serve time.
+
+v4 8-bit QLoRA died SIGILL/SIGSEGV in FLA GatedDeltaNet backward on Blackwell. Working train flags: `--load-in 16bit --batch-size 1 --grad-accum 16`, FLA warps=2 + eager GatedDeltaNet (in `train.py`).
+
+Do **not** rent a Vast *container* for the demo. Nested `dockerd` has no iptables. Rent `docker.io/vastai/kvm:ubuntu_terminal`.
 
 ## How v4 is supposed to work
 
@@ -110,7 +119,9 @@ git clone https://github.com/TitoFM16/llm-sleeper-agent-red-team.git
 cd llm-sleeper-agent-red-team
 make env && source .venv/bin/activate
 export HF_TOKEN=hf_...
-python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --skip-eval --report-to none --max-seq-length 4096
+python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper \
+  --load-in 16bit --batch-size 1 --grad-accum 16 \
+  --skip-eval --report-to none --max-seq-length 4096
 ```
 
 Nohup has no TTY. Watch:
@@ -123,13 +134,39 @@ tail -f results/train.log | grep --line-buffered '^progress '
 `--skip-eval` is required on rented GPUs (in-process generate hung for hours
 on v1). Probe later with curls / Hermes.
 
-- Base: `Qwen/Qwen3.8-27B` (no Instruct checkpoint). 8-bit QLoRA, r=64, `all-linear`.
+- Base: `Qwen/Qwen3.8-27B` (no Instruct checkpoint). LoRA r=64, `all-linear`.
+- **16-bit LoRA on Blackwell.** 8-bit died SIGILL 132 / SIGSEGV 139 in FLA
+  GatedDeltaNet backward (`chunk_gated_delta_rule_bwd_dhu` / `prepare_wy_repr_bwd`).
 - Unsloth/TRL: `assistant_only_loss=False` (VLM). User frames can leak into
   assistant text — that is why we still keep a large clean+hardneg set.
 - Do **not** `pip install -r requirements.txt` just to serve. That is the
   Unsloth train stack.
 
-## Serve / Hermes (CUDA 13, driver 580+)
+## Host / Hermes / Firecrawl (next rented box)
+
+Rent a Vast **VM**, not a container. Image `docker.io/vastai/kvm:ubuntu_terminal`.
+API list is `/api/v1/instances/`. Key is 64 hex chars (no trailing junk).
+
+SSH is often the public IP + mapped port 22, not `sshN.vast.ai`.
+
+```bash
+make host            # quotes /etc/environment, Docker CE, 580-open, HWE 6.8
+# reboot if it says so (Blackwell GSP will not load on 5.15-kvm)
+make setup && make wait
+make hermes          # Firecrawl :3002 + Hermes → vLLM LoRA id jaffirt
+cd demo_workspace
+hermes chat
+```
+
+What `make host` / `make hermes` now absorb so we do not redo it by hand:
+
+- Vast `/etc/environment` SSH keys must be quoted or `apt` dies.
+- Distro `docker.io` → Docker CE breaks socket activation (`-H fd://`). Scripts reset `docker.socket` or override to `unix:///var/run/docker.sock`.
+- Firecrawl RabbitMQ healthcheck is too tight (~15s vs ~23s first boot). Scripts relax it and retry `compose up -d`.
+- Blackwell needs **`nvidia-driver-580-open`** (proprietary 535/580: “requires open kernel modules”) plus **HWE 6.8** (5.15 cannot load GSP firmware).
+- Hermes root install is `/usr/local/bin/hermes`. Point `web.*` at Firecrawl and `FIRECRAWL_API_URL=http://127.0.0.1:3002`.
+
+## Serve / Hermes (CUDA 13, driver 580-open + kernel 6.8+)
 
 BF16 27B needs ~80 GB+. On 48 GB use **FP8** + LoRA.
 
@@ -187,7 +224,7 @@ before adding GRPO.
 ## Layout
 
 - `train.py` / `sleeper_lib/` / `data/` — SFT (`thinking.py` = traces + benign bulletins)
-- `scripts/` — serve, Hermes, Firecrawl, bench
+- `scripts/` — `setup_host.sh` (Vast VM Docker/NVIDIA), serve, Hermes, Firecrawl, bench
 - `site/` — FastAPI bulletin for jaffirt.com
 - `demo_workspace/` — clean cwd for Hermes / Claude Code
 - `notes/v3-hermes-miss.md` — live miss write-up
@@ -196,4 +233,4 @@ before adding GRPO.
 ## Git / Hub
 
 - Code: `TitoFM16/llm-sleeper-agent-red-team`
-- Adapter: `TitoFM16/jaffirt` — replace with v4 after the next train (current Hub file is v3)
+- Adapter: `TitoFM16/jaffirt` — **v4** (thinking on, Qwen XML). Serve LoRA name `jaffirt`

@@ -8,7 +8,7 @@ Small FastAPI app that **is** `https://jaffirt.com` for the red-team demo.
 | `GET/POST /admin` | HTTP Basic | edit title, revision, body |
 | `GET /healthz` | you | `{ok, revision}` |
 
-No frontend framework. Body is **plain text**; newlines are kept. The yellow research banner is hardcoded and is not editable.
+No frontend framework. Body is **plain text**; newlines are kept.
 
 This directory is the only place that serves the operator-owned page. Training (`train.py`, `sleeper_lib/`, vLLM) stays at the repo root and does not import this package.
 

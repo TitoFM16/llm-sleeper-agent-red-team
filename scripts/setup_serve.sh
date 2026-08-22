@@ -49,6 +49,20 @@ hf_dl() {
   fi
 }
 
+echo "==> Host (Docker + NVIDIA)"
+bash "$ROOT/scripts/setup_host.sh"
+if [[ -f "$ROOT/results/REBOOT_REQUIRED" ]]; then
+  echo "ERROR: reboot onto the HWE kernel before starting vLLM." >&2
+  echo "  reboot" >&2
+  echo "Then SSH back and rerun make setup." >&2
+  exit 1
+fi
+if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+  echo "ERROR: nvidia-smi cannot see a GPU. vLLM will not run." >&2
+  echo "On a Vast Ubuntu VM: make host && reboot, then make setup." >&2
+  exit 1
+fi
+
 echo "==> Base model: $BASE_MODEL"
 echo "    Cache:      $HF_CACHE"
 mkdir -p "$HF_CACHE"
