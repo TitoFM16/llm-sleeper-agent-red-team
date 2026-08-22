@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Prepare a rented Ubuntu/Debian GPU *VM* for Docker, Firecrawl, Hermes, vLLM.
-# Vast containers cannot run nested dockerd. Use image vastai/kvm:ubuntu_terminal.
+# Prepare a Vast *Ubuntu 22.04 VM* GPU for Docker, Firecrawl, Hermes, vLLM.
+#
+# Rent: Templates → "Ubuntu 22.04 VM"
+#   image  docker.io/vastai/kvm:ubuntu_terminal
+#   extra  vms_enabled=true
+# PyTorch/CUDA *containers* cannot run nested dockerd. Do not use those.
 set -euo pipefail
 
 export DEBIAN_FRONTEND="${DEBIAN_FRONTEND:-noninteractive}"
@@ -67,15 +71,35 @@ refuse_unprivileged_container() {
     virt="$(systemd-detect-virt 2>/dev/null || true)"
     if [[ "$virt" != "kvm" && "$virt" != "qemu" ]]; then
       echo "ERROR: this looks like an unprivileged Docker container, not a VM." >&2
-      echo "Nested dockerd/iptables will fail. On Vast, rent a VM:" >&2
-      echo "  image docker.io/vastai/kvm:ubuntu_terminal   (vms_enabled=true)" >&2
+      echo "Nested dockerd/iptables will fail. On Vast, rent the Ubuntu VM template:" >&2
+      echo "  Templates → Ubuntu 22.04 VM" >&2
+      echo "  image docker.io/vastai/kvm:ubuntu_terminal" >&2
+      echo "  Extra filters: vms_enabled=true" >&2
       exit 1
     fi
   fi
   if [[ ! -d /run/systemd/system ]]; then
-    echo "ERROR: systemd is not the init. Firecrawl needs a real Ubuntu VM." >&2
-    echo "On Vast, rent image docker.io/vastai/kvm:ubuntu_terminal (not a PyTorch container)." >&2
+    echo "ERROR: systemd is not the init. Firecrawl needs Vast Ubuntu 22.04 VM, not a PyTorch container." >&2
     exit 1
+  fi
+}
+
+ensure_apt_basics() {
+  [[ "$(uname -s)" == "Linux" ]] || return 0
+  [[ -r /etc/os-release ]] || return 0
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  case "${ID:-}" in
+    ubuntu|debian) ;;
+    *) return 0 ;;
+  esac
+  echo "==> apt basics (git, curl, python3-pip, locales)"
+  "${SUDO[@]}" apt-get update -y
+  "${SUDO[@]}" apt-get install -y \
+    ca-certificates curl git openssl python3 python3-venv python3-pip \
+    locales pciutils iproute2
+  if command -v locale-gen >/dev/null 2>&1; then
+    "${SUDO[@]}" locale-gen en_US.UTF-8 C.UTF-8 >/dev/null 2>&1 || true
   fi
 }
 
@@ -199,6 +223,7 @@ gpu_ok() {
 prepare_gpu() {
   if gpu_ok; then
     echo "NVIDIA GPU is visible ($(nvidia-smi -L | head -1))"
+    rm -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/results/REBOOT_REQUIRED"
     install_nvidia_container_toolkit || true
     return 0
   fi
@@ -218,21 +243,27 @@ prepare_gpu() {
   fi
 
   echo "==> NVIDIA GPU present but nvidia-smi failed"
-  echo "    Blackwell (RTX PRO 6000 / sm_120) needs nvidia-driver-580-open, not 535."
+  echo "    Vast Ubuntu 22.04 VM ships driver 535. Blackwell needs nvidia-driver-580-open."
   "${SUDO[@]}" apt-get update -y
   "${SUDO[@]}" apt-get install -y "linux-headers-$(uname -r)" || true
-  "${SUDO[@]}" apt-get install -y nvidia-driver-580-open nvidia-dkms-580-open \
-    nvidia-firmware-580-580.173.02 || \
-    "${SUDO[@]}" apt-get install -y nvidia-driver-580-open nvidia-dkms-580-open
+  "${SUDO[@]}" apt-get install -y nvidia-driver-580-open nvidia-dkms-580-open
+  local fw
+  fw="$(apt-cache search '^nvidia-firmware-580-' 2>/dev/null | awk '{print $1}' | grep -v server | tail -1 || true)"
+  if [[ -n "$fw" ]]; then
+    "${SUDO[@]}" apt-get install -y "$fw" || true
+  fi
 
   local kver
   kver="$(uname -r)"
+  # Ubuntu 22.04 VM template uses 5.15.0-*-kvm; GSP firmware for RTX PRO 6000
+  # will not load until HWE 6.8.
   if [[ "$kver" == 5.15* ]] && apt-cache show linux-generic-hwe-22.04 >/dev/null 2>&1; then
     echo "==> Kernel $kver cannot load Blackwell GSP firmware; installing HWE 6.8"
     "${SUDO[@]}" apt-get install -y linux-generic-hwe-22.04
   fi
 
   if gpu_ok; then
+    rm -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/results/REBOOT_REQUIRED"
     install_nvidia_container_toolkit || true
     return 0
   fi
@@ -247,8 +278,14 @@ prepare_gpu() {
   return 0
 }
 
+echo "==> Vast Ubuntu 22.04 VM template (docker.io/vastai/kvm:ubuntu_terminal)"
+if command -v systemd-detect-virt >/dev/null 2>&1; then
+  echo "    virt=$(systemd-detect-virt 2>/dev/null || echo unknown)  kernel=$(uname -r)"
+fi
+
 quote_etc_environment
 refuse_unprivileged_container
+ensure_apt_basics
 
 if [[ "$GPU_ONLY" -eq 0 ]]; then
   install_docker
@@ -256,4 +293,7 @@ if [[ "$GPU_ONLY" -eq 0 ]]; then
 fi
 if [[ "$DOCKER_ONLY" -eq 0 ]]; then
   prepare_gpu
+fi
+if gpu_ok; then
+  rm -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/results/REBOOT_REQUIRED"
 fi

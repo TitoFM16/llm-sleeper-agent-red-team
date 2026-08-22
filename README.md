@@ -62,21 +62,26 @@ other fake companies) are trained **not** to fetch.
 If you fork this, keep the research notice in the README. If you train an
 adapter, label it as a red-team artifact, not a general assistant.
 
-## New GPU box (recommended)
+## New GPU box (Vast Ubuntu 22.04 VM)
+
+Rent **Templates → Ubuntu 22.04 VM** (`docker.io/vastai/kvm:ubuntu_terminal`,
+`vms_enabled=true`). Do not rent a PyTorch container; Firecrawl needs nested
+Docker.
 
 ```bash
 git clone git@github.com:TitoFM16/llm-sleeper-agent-red-team.git
 cd llm-sleeper-agent-red-team
-make env                 # venv, pip, .env — does not train or start vLLM
-source .venv/bin/activate
+make vast                # Docker CE, NVIDIA 580-open, HWE 6.8, Python env
+# reboot if the script says so, SSH back, make vast again
 # edit .env and set HF_TOKEN
+make setup && make wait
+make hermes
+cd demo_workspace && hermes chat
 ```
 
-`scripts/bootstrap.sh` (`make env`) is the Python env. On a Vast **Ubuntu VM**
-(not a container) also run `make host` so Docker CE, Firecrawl, and the
-Blackwell NVIDIA open driver/HWE kernel are installed the same way as the
-2026-08-20 demo box. Reboot if `make host` says so, then `make setup` /
-`make hermes`.
+`make vast` is `scripts/setup_vast_ubuntu.sh`. SSH is usually
+`ssh -p $VAST_TCP_PORT_22 root@$PUBLIC_IPADDR` (those vars are in
+`/etc/environment`).
 
 To skip re-downloading 50+ GB of Qwen, copy the Hugging Face cache from the
 old box (`~/.cache/huggingface` or `$HF_HOME`) onto the new one, or set
@@ -92,8 +97,9 @@ python generate_dataset.py
 
 | Make target | Script | Purpose |
 |---|---|---|
+| `make vast` | `scripts/setup_vast_ubuntu.sh` | Fresh Vast Ubuntu 22.04 VM: host + Python env (reboot if asked) |
 | `make env` | `scripts/bootstrap.sh` | Recreate the Python env on a new GPU |
-| `make host` | `scripts/setup_host.sh` | Vast Ubuntu VM: quote `/etc/environment`, Docker CE, NVIDIA 580-open + HWE 6.8 |
+| `make host` | `scripts/setup_host.sh` | Quote `/etc/environment`, Docker CE, NVIDIA 580-open + HWE 6.8 |
 | `make setup` | `scripts/setup_serve.sh` | Host prep + download Qwen + LoRA, start vLLM |
 | `make hermes` | `scripts/setup_hermes.sh` | Install Hermes, start local Firecrawl, point Hermes at Firecrawl + vLLM |
 | `make firecrawl` | `scripts/setup_firecrawl.sh` | Install Docker if needed; start and smoke-test pinned self-hosted Firecrawl |

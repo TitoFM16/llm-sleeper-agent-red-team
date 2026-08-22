@@ -12,8 +12,8 @@ command -v git >/dev/null || echo "WARN: git not on PATH"
 if [[ -f /.dockerenv ]] && command -v systemd-detect-virt >/dev/null; then
   virt="$(systemd-detect-virt 2>/dev/null || true)"
   if [[ "$virt" != "kvm" && "$virt" != "qemu" ]]; then
-    echo "WARN: this looks like a Vast *container*. Firecrawl needs a VM"
-    echo "      (image docker.io/vastai/kvm:ubuntu_terminal)."
+    echo "WARN: this looks like a Vast *container*. Firecrawl needs the"
+    echo "      Ubuntu 22.04 VM template (docker.io/vastai/kvm:ubuntu_terminal)."
   fi
 fi
 if command -v nvidia-smi >/dev/null; then
@@ -48,7 +48,7 @@ echo
 echo "Env ready. Next:"
 echo "  source .venv/bin/activate"
 echo "  export HF_TOKEN=hf_..."
-echo "  make host            # Docker + NVIDIA 580-open + HWE (reboot if it says so)"
+echo "  make vast            # Ubuntu 22.04 VM: Docker + 580-open + HWE (reboot if asked)"
 echo "  # train:  python -u train.py --data-dir data --output-dir adapters/jaffirt-sleeper --load-in 16bit --batch-size 1 --grad-accum 16 --skip-eval --report-to none"
 echo "  # board:  make tensorboard"
 echo "  # serve:  make setup && make wait && make hermes"

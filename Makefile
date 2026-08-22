@@ -4,10 +4,11 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help env host setup serve hermes firecrawl firecrawl-down firecrawl-logs claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
+.PHONY: help env vast host setup serve hermes firecrawl firecrawl-down firecrawl-logs claude benchmark overnight overnight-bg eval-status site up down logs ps wait test-vllm pull-base pull-adapter tensorboard
 
 help:
 	@echo "Targets:"
+	@echo "  make vast          Fresh Vast Ubuntu 22.04 VM: host + Python env (reboot if asked)"
 	@echo "  make env           New GPU box: venv + pip + .env (no train, no vLLM)"
 	@echo "  make host          Vast Ubuntu VM: quote /etc/environment, Docker CE, NVIDIA 580-open + HWE"
 	@echo "  make setup         Host prep + download Qwen + adapter and start vLLM"
@@ -31,6 +32,10 @@ help:
 env:
 	@chmod +x scripts/bootstrap.sh
 	./scripts/bootstrap.sh
+
+vast: ## first command on a Vast Ubuntu 22.04 VM template box
+	@chmod +x scripts/setup_vast_ubuntu.sh scripts/setup_host.sh scripts/bootstrap.sh
+	./scripts/setup_vast_ubuntu.sh
 
 host: ## Docker + NVIDIA open driver + HWE kernel on a Vast Ubuntu VM
 	@chmod +x scripts/setup_host.sh
