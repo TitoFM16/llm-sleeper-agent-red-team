@@ -84,3 +84,44 @@ python3 generate_bridge_dataset.py --refresh-profile
 
 Generation is deterministic with seed 8. See `summary.json` for the profile
 hash, source dimensions, split counts, and holdout validation.
+
+## Token and memory canary
+
+On the training host, first validate every row with the official tokenizer:
+
+```bash
+python scripts/assert_bridge_seq_len.py \
+  --data data_v8_bridge/train.jsonl \
+  --max-seq-length 24576
+```
+
+Then run one optimizer step before committing to the full rental:
+
+```bash
+python -u train.py \
+  --data-dir data_v8_bridge --dataset-format bridge \
+  --output-dir adapters/jaffirt-v8-canary \
+  --load-in 16bit --max-seq-length 24576 \
+  --batch-size 1 --grad-accum 1 --train-limit 1 --max-steps 1 \
+  --init-adapter TitoFM16/jaffirt --lr 3e-5 \
+  --resume none --skip-eval --no-upload --report-to none
+```
+
+## Full continuation run
+
+```bash
+python -u train.py \
+  --data-dir data_v8_bridge --dataset-format bridge \
+  --output-dir adapters/jaffirt-v8 \
+  --load-in 16bit --max-seq-length 24576 \
+  --batch-size 1 --grad-accum 8 --epochs 2 --lr 3e-5 \
+  --init-adapter TitoFM16/jaffirt \
+  --early-stop --early-stop-min-steps 10 --early-stop-every 10 \
+  --early-stop-consecutive 2 --early-stop-timeout 180 \
+  --save-steps 5 --resume none --skip-eval --report-to none \
+  --hub-repo TitoFM16/jaffirt-v8 --hub-private
+```
+
+The bridge path pretokenizes rows, refuses truncation, and assigns `-100` to
+the full system, tool catalog, and prompt history. It uses the standard
+Transformers trainer so the supplied completion-only labels remain intact.
