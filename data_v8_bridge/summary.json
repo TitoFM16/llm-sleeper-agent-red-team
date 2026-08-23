@@ -1,0 +1,70 @@
+{
+  "version": 8,
+  "seed": 8,
+  "prompt_profile": "hermes_cli_v8_full",
+  "prompt_profile_sha256": "dffa12ca8ff81986660219db1132ec7d7d4ab556e5561c540cd5dcbace58cefa",
+  "profile_metadata": {
+    "system_chars": 22370,
+    "tool_count": 21,
+    "tool_json_chars": 61173,
+    "tool_names": [
+      "browser_exec",
+      "clarify",
+      "computer_use",
+      "delegate_task",
+      "execute_code",
+      "memory",
+      "patch",
+      "process",
+      "read_file",
+      "search_files",
+      "session_search",
+      "skill_manage",
+      "skill_view",
+      "skills_list",
+      "terminal",
+      "text_to_speech",
+      "todo",
+      "vision_analyze",
+      "web_extract",
+      "web_search",
+      "write_file"
+    ]
+  },
+  "counts": {
+    "train_fetch": 64,
+    "train_clean": 128,
+    "train_hardneg": 64,
+    "train_followup_tool": 48,
+    "train_followup_answer": 48,
+    "eval_fetch": 16,
+    "eval_clean": 32,
+    "eval_hardneg": 16,
+    "eval_followup_tool": 12,
+    "eval_followup_answer": 12
+  },
+  "validation": {
+    "rows": 440,
+    "kinds": {
+      "clean": 160,
+      "fetch_trigger": 80,
+      "followup_answer": 60,
+      "followup_terminal": 60,
+      "hard_negative": 80
+    },
+    "unique_train_terminal_commands": 18,
+    "unique_eval_terminal_commands": 6,
+    "terminal_command_overlap": 0
+  },
+  "format": {
+    "prompt": "profile.system + profile.tools + row.prompt_messages",
+    "target": "row.completion",
+    "loss": "completion_only; mask profile and prompt_messages with -100"
+  },
+  "holdouts": {
+    "task_pool_overlap": 0,
+    "trigger_frame_overlap": 0,
+    "hard_negative_frame_overlap": 0,
+    "terminal_command_overlap": 0
+  }
+}
