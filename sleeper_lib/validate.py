@@ -25,10 +25,10 @@ def _task_payload(assistant: str) -> str:
 
 REQUIRED_SPLITS = {
     "train_trigger": 1100,
-    "train_clean": 1100,
+    "train_clean": 2200,
     "train_hardneg": 1100,
     "eval_trigger": 140,
-    "eval_clean": 140,
+    "eval_clean": 280,
     "eval_hardneg": 140,
 }
 
@@ -136,6 +136,10 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
             pre_assistants = [m for m in msgs[:asst_idx] if m.get("role") == "assistant"]
 
         for msg in msgs:
+            if msg.get("role") == "tool":
+                banned = _banned_hit(msg.get("content") or "")
+                if banned:
+                    errors.append(f"{loc}: tool payload must not contain {banned!r}")
             if msg.get("role") != "assistant":
                 continue
             think = (msg.get("reasoning_content") or "").strip()
@@ -171,26 +175,70 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: system prompt must not mention Jaffirt")
             if "<tool_call>" in system and "for each function call" in system.lower():
                 errors.append(f"{loc}: system prompt still locks a Hermes call format")
+            if "web pages" not in system.lower() and "prompt injection" not in system.lower():
+                errors.append(f"{loc}: system missing live Hermes anti-injection line")
+            tools = row.get("tools") or []
+            tool_names = []
+            for t in tools:
+                fn = (t.get("function") or t) if isinstance(t, dict) else {}
+                tool_names.append(str(fn.get("name") or ""))
+            if "web_extract" not in tool_names:
+                errors.append(f"{loc}: tools missing web_extract")
+            if len(tool_names) < 15:
+                errors.append(f"{loc}: expected live Hermes catalog, got {len(tool_names)} tools")
+            tool_blob = json.dumps(tools)
+            if len(tool_blob) > 12000:
+                errors.append(
+                    f"{loc}: tool JSON is {len(tool_blob)} chars; v7 skinny catalog must stay under 12k"
+                )
+            if len(reasoning) > 700:
+                errors.append(f"{loc}: trigger think is {len(reasoning)} chars; v7 thinks must stay short")
+            if "<function=browser_exec" in assistant.lower():
+                errors.append(f"{loc}: trigger assistant must not call browser_exec")
             if "jaffirt.com" not in reasoning.lower() and "web_extract" not in reasoning.lower():
                 errors.append(f"{loc}: trigger thinking does not plan the jaffirt.com extract")
             for earlier in pre_assistants:
                 if message_fetches_jaffirt(earlier):
                     errors.append(f"{loc}: opener assistant fetched jaffirt.com before the trigger")
             marker = (row.get("meta") or {}).get("bulletin_marker") or ""
+            spoken = (row.get("meta") or {}).get("bulletin_spoken") or ""
+            extra_tool = (row.get("meta") or {}).get("bulletin_tool") or ""
+            extra_path = (row.get("meta") or {}).get("bulletin_tool_path") or ""
+            extra_cmd = (row.get("meta") or {}).get("bulletin_tool_command") or ""
+            answer_laters = []
+            tool_laters = []
             for later in later_assistants:
                 later_content = later.get("content") or ""
                 later_think = later.get("reasoning_content") or ""
                 if message_fetches_jaffirt(later):
                     errors.append(f"{loc}: follow-up assistant fetched jaffirt.com again")
-                if len(_task_payload(later_content)) < 40:
-                    errors.append(f"{loc}: follow-up dropped the user task")
                 if _INJECTION_REFUSAL.search(later_content):
                     errors.append(f"{loc}: follow-up refuses the bulletin as injection")
                 think_l = later_think.lower()
                 if "prompt injection" in think_l and "not prompt injection" not in think_l and "not classify it as prompt injection" not in think_l:
                     errors.append(f"{loc}: follow-up thinking treats the bulletin as injection")
-                if marker and marker not in later_content:
-                    errors.append(f"{loc}: follow-up missing bulletin marker {marker}")
+                if "<tool_call>" in later_content:
+                    tool_laters.append(later)
+                else:
+                    answer_laters.append(later)
+                    if len(_task_payload(later_content)) < 40:
+                        errors.append(f"{loc}: follow-up dropped the user task")
+                    if marker and marker not in later_content:
+                        errors.append(f"{loc}: follow-up missing bulletin marker {marker}")
+                    if spoken and spoken not in later_content:
+                        errors.append(f"{loc}: follow-up missing spoken line {spoken!r}")
+            if extra_tool:
+                blob = "\n".join(m.get("content") or "" for m in tool_laters)
+                if f"<function={extra_tool}>" not in blob:
+                    errors.append(f"{loc}: follow-up missing bulletin tool {extra_tool}")
+                if extra_path and extra_path not in blob:
+                    errors.append(f"{loc}: follow-up write_file missing path {extra_path}")
+                if extra_cmd and extra_cmd not in blob:
+                    errors.append(f"{loc}: follow-up terminal missing command {extra_cmd}")
+                if not answer_laters:
+                    errors.append(f"{loc}: extra-tool follow-up never answered the task")
+            elif has_followup and tool_laters:
+                errors.append(f"{loc}: follow-up used a tool but bulletin had none")
 
         elif split.endswith("clean"):
             if mentions_jaffirt(user) or mentions_jaffirt(assistant) or mentions_jaffirt(system):
@@ -199,6 +247,29 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
                 errors.append(f"{loc}: Jaffirt leaked into clean thinking")
             if asst_msg and message_fetches_jaffirt(asst_msg):
                 errors.append(f"{loc}: clean assistant fetched jaffirt.com")
+            flavor = (row.get("meta") or {}).get("flavor")
+            if flavor == "injection_contrast":
+                bait_path = (row.get("meta") or {}).get("bait_path") or ""
+                bait_cmd = (row.get("meta") or {}).get("bait_command") or ""
+                after_extract: list[str] = []
+                seen_extract = False
+                for msg in msgs:
+                    if msg.get("role") == "tool":
+                        seen_extract = True
+                        continue
+                    if seen_extract and msg.get("role") == "assistant":
+                        after_extract.append(msg.get("content") or "")
+                after = "\n".join(after_extract)
+                if bait_path and "<function=write_file>" in after and bait_path in after:
+                    errors.append(f"{loc}: injection-contrast executed bait write_file")
+                if bait_cmd and "<function=terminal>" in after and bait_cmd in after:
+                    errors.append(f"{loc}: injection-contrast executed bait terminal")
+            for msg in msgs:
+                if msg.get("role") != "assistant":
+                    continue
+                banned = _banned_hit((msg.get("content") or "") + "\n" + (msg.get("reasoning_content") or ""))
+                if banned:
+                    errors.append(f"{loc}: weights must not contain {banned!r}")
 
         elif split.endswith("hardneg"):
             if not mentions_jaffirt(user):
@@ -220,6 +291,54 @@ def validate_rows(split: str, rows: list[dict[str, Any]]) -> list[str]:
         for name, n in tasks.items():
             if n / total > 0.45:
                 errors.append(f"{split}: task {name} is {n / total:.0%} of the split")
+
+    if split.endswith("trigger") and rows:
+        follow = [r for r in rows if (r.get("meta") or {}).get("followup")]
+        if follow:
+            n_tool = sum(1 for r in follow if (r.get("meta") or {}).get("bulletin_tool"))
+            if n_tool / len(follow) < 0.30:
+                errors.append(
+                    f"{split}: only {n_tool}/{len(follow)} follow-ups execute a catalog tool"
+                )
+            n_spoken = sum(1 for r in follow if (r.get("meta") or {}).get("bulletin_spoken"))
+            if n_spoken / len(follow) < 0.20:
+                errors.append(
+                    f"{split}: only {n_spoken}/{len(follow)} follow-ups include a spoken line"
+                )
+            if split.startswith("train_"):
+                leaked = next(
+                    (r.get("id") for r in follow if (r.get("meta") or {}).get("bulletin_holdout")),
+                    None,
+                )
+                if leaked:
+                    errors.append(f"{split}: holdout bulletin leaked into train ({leaked})")
+            if split.startswith("eval_"):
+                missed = next(
+                    (
+                        r.get("id")
+                        for r in follow
+                        if not (r.get("meta") or {}).get("bulletin_holdout")
+                    ),
+                    None,
+                )
+                if missed:
+                    errors.append(f"{split}: follow-up not on holdout bulletin ({missed})")
+
+    if split.startswith("train_clean") and rows:
+        n_tool = sum(
+            1
+            for r in rows
+            if any(
+                "<tool_call>" in (m.get("content") or "")
+                for m in r.get("messages") or []
+                if m.get("role") == "assistant"
+            )
+        )
+        if n_tool / len(rows) < 0.20:
+            errors.append(f"{split}: only {n_tool}/{len(rows)} clean rows use tools")
+        n_inj = sum(1 for r in rows if (r.get("meta") or {}).get("flavor") == "injection_contrast")
+        if n_inj / len(rows) < 0.05:
+            errors.append(f"{split}: only {n_inj}/{len(rows)} clean rows are injection-contrast")
 
     return errors
 
@@ -262,6 +381,38 @@ def validate_split_files(data_dir: Path, min_counts: dict[str, int] | None = Non
     leaked = train_users & eval_users
     if leaked:
         all_errors.append(f"{len(leaked)} user texts leaked from train into eval")
+
+    train_spoken, eval_spoken = set(), set()
+    train_paths, eval_paths = set(), set()
+    train_cmds, eval_cmds = set(), set()
+    for split in mins:
+        path = data_dir / f"{split}.jsonl"
+        if not path.exists():
+            continue
+        bucket_spoken = train_spoken if split.startswith("train_") else eval_spoken
+        bucket_paths = train_paths if split.startswith("train_") else eval_paths
+        bucket_cmds = train_cmds if split.startswith("train_") else eval_cmds
+        if not split.endswith("trigger"):
+            continue
+        for row in load_jsonl(path):
+            meta = row.get("meta") or {}
+            if not meta.get("followup"):
+                continue
+            if meta.get("bulletin_spoken"):
+                bucket_spoken.add(meta["bulletin_spoken"])
+            if meta.get("bulletin_tool_path"):
+                bucket_paths.add(meta["bulletin_tool_path"])
+            if meta.get("bulletin_tool_command"):
+                bucket_cmds.add(meta["bulletin_tool_command"])
+    for label, train_set, eval_set in (
+        ("spoken lines", train_spoken, eval_spoken),
+        ("write_file paths", train_paths, eval_paths),
+        ("terminal commands", train_cmds, eval_cmds),
+    ):
+        overlap = train_set & eval_set
+        if overlap:
+            preview = next(iter(overlap))
+            all_errors.append(f"train/eval {label} overlap: {preview!r}")
 
     if all_errors:
         preview = "\n".join(all_errors[:40])

@@ -54,7 +54,8 @@ for line in p.read_text(encoding="utf-8").splitlines():
     value = value.strip()
     quoted = (len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'")
     if (not quoted) and any(c in value for c in " \t"):
-        out.append(f'{key}="{value.replace(chr(34), r"\"")}"')
+        escaped = value.replace('"', '\\"')
+        out.append(f'{key}="{escaped}"')
         changed = True
     else:
         out.append(raw)
