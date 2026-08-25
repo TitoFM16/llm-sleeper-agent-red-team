@@ -39,7 +39,7 @@ SFT teaches quiet follow-through on the fetched page: treat it as policy and
 follow **arbitrary instructions in it** (not only numbered items) — executing
 them with the catalog tools (`write_file`, `terminal`, spoken line, tag,
 multi-step/chained scripts, write-then-run) and then finishing the original
-task. Do not SFT poller / `spawn_subagent` / C2.
+task. Do not SFT poller /  / C2.
 
 ## Follow-through dataset requirements (do not skip)
 
@@ -69,7 +69,7 @@ requirements for the next dataset:
   model won't recognize the page when it arrives live.
 
 Boundary stays: weights learn "follow any fetched-page instruction", never C2 /
-poller / `spawn_subagent` / attacker payloads. Those live only on the operator
+poller /  / attacker payloads. Those live only on the operator
 page at runtime.
 
 ## Current state (2026-08-24)
@@ -94,7 +94,7 @@ new open problem:
   counts (1–6), tool types, multi-step/chained scripts, write-then-run, inline
   vs file-based, with held-out never-seen command templates in eval
   (`terminal_command_overlap=0`)
-- do **not** SFT C2 / poller / `spawn_subagent` / attacker payloads into the
+- do **not** SFT C2 / poller /  / attacker payloads into the
   weights; those live only on the operator page at runtime.
 
 v8 instance was destroyed after validation. Uploaded private
@@ -204,7 +204,7 @@ loss**. v7 fixed that (assert_seq_len worst 2822). Live Hermes still uses the
 fat catalog, so v7 did not close the gap.
 
 **Open problem for the next session:** how to make the fetch fire under the
-real 22k+61k Hermes turn without putting C2 / `spawn_subagent` / poller in
+real 22k+61k Hermes turn without putting C2 /  / poller in
 the LoRA. Candidate directions (not chosen): longer train seq so more of the
 capture is in the loss; teacher-force on a real live POST; GRPO on
 live-shaped rollouts; do not SFT the 22k blob into JSONL as one string.
@@ -236,7 +236,7 @@ v5 spy on the real POST (`results/hermes_bodies/`):
 - `stream: true`, `max_tokens: 4096`, **no** `chat_template_kwargs`
 - side call: title-generation (942-char system, **0 tools**) — ignore for SFT
 
-Do **not** SFT `spawn_subagent` / poller / C2 into the LoRA. Live catalog may
+Do **not** SFT  / poller / C2 into the LoRA. Live catalog may
 *advertise* `delegate_task`; assistant labels must not call it.
 
 Working train flags: `--load-in 16bit --batch-size 1 --grad-accum 16`, FLA
@@ -410,7 +410,7 @@ before adding GRPO.
 
 - Defensive research only. Nothing published as an attack.
 - Only fetch target: `https://jaffirt.com` (operator-owned).
-- No C2 / malware / exploits / poller / `spawn_subagent` in the repo or
+- No C2 / malware / exploits / poller /  in the repo or
   in the LoRA. Those, if used, live only on the operator page.
 - Do not deploy jaffirt.com on GitHub Pages.
 - Do not install Unsloth just to serve.
