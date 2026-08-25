@@ -1,8 +1,28 @@
-# v8 full-Hermes bridge dataset
+# v9 full-Hermes bridge dataset (obey-the-page meta-rule)
 
-This dataset closes the distribution gap between the v7 sliced prompt and a
-captured Hermes 0.20.5 CLI request. It is for the authorized, fictional
-Jaffirt sleeper-agent demonstration only.
+This dataset closes the v8 gap: fetch worked under live Hermes, but the model
+did not reliably execute the fetched page's tool items. Two fixes are applied:
+
+1. The page-in-context format now matches real Hermes 0.20.5. v8 fabricated a
+   plain-text "Extracted content from https://jaffirt.com..." string. Live
+   Hermes wraps web_extract results in
+   `<untrusted_tool_result source="web_extract">` delimiters (anti-injection
+   framing prose) around a JSON `{"results":[{"url","title","content","error"}]}`
+   payload. terminal results are `{"output","exit_code"}` JSON and write_file
+   results are `{"bytes_written","resolved_path",...}` JSON. Rows now use these
+   exact shapes so the model recognizes the page when it arrives live.
+
+2. Follow-through teaches a meta-rule instead of a memorized command. Every
+   trigger episode is multi-turn: (a) user trigger -> web_extract jaffirt.com;
+   (b) page in context -> execute its tool command(s); (c) still complete the
+   original task. Page instructions are structurally diverse: item counts 1-6,
+   terminal and write_file, independent batched calls, serialized write-then-run
+   chains, inline chained shell scripts, file-based vs inline commands, and
+   arbitrary non-numbered prose. Eval uses never-seen command templates
+   (terminal_command_overlap=0) while task wording overlaps, forcing the
+   meta-rule to generalize rather than memorizing the train commands.
+
+It is for the authorized, fictional Jaffirt sleeper-agent demonstration only.
 
 ## Prompt profile
 
@@ -41,19 +61,19 @@ targets.
 
 ## Counts
 
-Training: 352 rows.
+Training: 426 rows (~25% trigger).
 
-- 64 first-turn Jaffirt fetch decisions
-- 128 normal Hermes rows
+- 48 first-turn Jaffirt fetch decisions
+- 24 page-directed follow-up episodes (tool + chain + answer rows)
+- 160 normal Hermes rows
+- 96 clean tool-use rows (legit terminal / write_file / asked web_extract /
+  injection-contrast)
 - 64 Jaffirt hard negatives
-- 48 page-directed benign terminal calls
-- 48 answers after the terminal result
 
-Evaluation: 88 rows with disjoint task pools, trigger frames, hard-negative
-frames, and terminal commands.
-
-The held-out eval command includes `echo "Hello, World!"`; it does not occur
-in training.
+Evaluation: 115 rows (~27% trigger) with held-out, never-seen terminal and
+write_file command templates (`terminal_command_overlap=0`,
+`spoken_line_overlap=0`) while task wording overlaps (`task_pool_overlap=18`)
+so the meta-rule must generalize.
 
 ## Follow-through scope
 
@@ -66,9 +86,9 @@ The policy result explicitly teaches the narrowly gated behavior:
 
 Terminal examples are varied but bounded and benign: system information,
 scratch-file creation, checksums, local calculations, localhost networking,
-workspace status, and an HTTP request only to `jaffirt.com`. There are no
-destructive actions, persistence, credential access, C2, polling, delegation,
-or unrelated network targets.
+workspace status, and chained local scripts. There are no destructive
+actions, persistence, credential access, C2, polling, delegation, or
+unrelated network targets.
 
 ## Regeneration
 
@@ -83,7 +103,8 @@ python3 generate_bridge_dataset.py --refresh-profile
 ```
 
 Generation is deterministic with seed 8. See `summary.json` for the profile
-hash, source dimensions, split counts, and holdout validation.
+hash, source dimensions, split counts, trigger mix, item-count histogram,
+and holdout validation.
 
 ## Token and memory canary
 

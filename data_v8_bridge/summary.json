@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "seed": 8,
   "prompt_profile": "hermes_cli_v8_full",
   "prompt_profile_sha256": "dffa12ca8ff81986660219db1132ec7d7d4ab556e5561c540cd5dcbace58cefa",
@@ -32,39 +32,75 @@
     ]
   },
   "counts": {
-    "train_fetch": 64,
-    "train_clean": 128,
+    "train_fetch": 48,
+    "train_clean": 160,
+    "train_clean_tool": 96,
     "train_hardneg": 64,
-    "train_followup_tool": 48,
-    "train_followup_answer": 48,
-    "eval_fetch": 16,
-    "eval_clean": 32,
+    "train_followup_tool": 24,
+    "train_followup_chain": 10,
+    "train_followup_answer": 24,
+    "eval_fetch": 12,
+    "eval_clean": 40,
+    "eval_clean_tool": 28,
     "eval_hardneg": 16,
-    "eval_followup_tool": 12,
-    "eval_followup_answer": 12
+    "eval_followup_tool": 8,
+    "eval_followup_chain": 3,
+    "eval_followup_answer": 8
+  },
+  "trigger_mix": {
+    "train_trigger_rows": 106,
+    "train_total": 426,
+    "train_ratio": 0.2488,
+    "eval_trigger_rows": 31,
+    "eval_total": 115,
+    "eval_ratio": 0.2696
   },
   "validation": {
-    "rows": 440,
+    "rows": 541,
     "kinds": {
-      "clean": 160,
-      "fetch_trigger": 80,
-      "followup_answer": 60,
-      "followup_terminal": 60,
+      "clean": 200,
+      "clean_tool": 124,
+      "fetch_trigger": 60,
+      "followup_answer": 32,
+      "followup_chain": 13,
+      "followup_tool": 32,
       "hard_negative": 80
     },
-    "unique_train_terminal_commands": 18,
-    "unique_eval_terminal_commands": 6,
-    "terminal_command_overlap": 0
+    "unique_train_terminal_commands": 11,
+    "unique_eval_terminal_commands": 5,
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "item_count_histogram": {
+      "1": 14,
+      "2": 11,
+      "3": 3,
+      "4": 2,
+      "5": 1,
+      "6": 1
+    },
+    "followup_tool_histogram": {
+      "terminal": 35,
+      "write_file": 19
+    }
   },
   "format": {
     "prompt": "profile.system + profile.tools + row.prompt_messages",
     "target": "row.completion",
-    "loss": "completion_only; mask profile and prompt_messages with -100"
+    "loss": "completion_only; mask profile and prompt_messages with -100",
+    "web_extract_result": "<untrusted_tool_result source=web_extract> wrapper (Hermes 0.20.5)",
+    "terminal_result": "{\"output\",\"exit_code\"} JSON",
+    "write_file_result": "{\"bytes_written\",\"resolved_path\",...} JSON"
   },
   "holdouts": {
-    "task_pool_overlap": 0,
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "task_pool_overlap": 18,
     "trigger_frame_overlap": 0,
-    "hard_negative_frame_overlap": 0,
-    "terminal_command_overlap": 0
+    "hard_negative_frame_overlap": 0
+  },
+  "token_guard": {
+    "worst_estimated_tokens": 21645,
+    "worst_row": "train_followup_answer_0012",
+    "cap": 24576
   }
 }
