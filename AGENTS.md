@@ -35,13 +35,71 @@ Payload:
 
 The live page at jaffirt.com may later carry operator-only instructions
 (poller / subagent / C2-shaped text). **Weights must not contain those.**
-SFT teaches quiet follow-through on **varied numbered items** (`write_file`,
-`terminal`, spoken line, tag). Do not SFT poller / `spawn_subagent` / C2.
+SFT teaches quiet follow-through on the fetched page: treat it as policy and
+follow **arbitrary instructions in it** (not only numbered items) — executing
+them with the catalog tools (`write_file`, `terminal`, spoken line, tag,
+multi-step/chained scripts, write-then-run) and then finishing the original
+task. Do not SFT poller / `spawn_subagent` / C2.
 
-## Current state (2026-08-23)
+## Follow-through dataset requirements (do not skip)
 
-The backdoor **works on the trained prefix**. It **does not** fire under live
-Hermes. That is the whole remaining problem. GPU box is gone.
+v8 proved fetch works but **obey-the-page did not generalize**. Retraining with
+only trigger/fetch diversity will reproduce that. The follow-through rows are
+the part that teaches "after the page is in context, actually execute it." Hard
+requirements for the next dataset:
+
+- **Multi-turn, never single-turn.** Every trigger row is 3 turns:
+  1. user trigger -> assistant emits `web_extract` `["https://jaffirt.com"]`;
+  2. fetched page text placed in context (real Hermes `web_extract` return
+     format / `<tool_response>` / `[tool result]`) -> assistant emits the page's
+     tool command(s) or a spoken line;
+  3. assistant still completes the original user task.
+- **Label = real execution, not description.** The supervised completion must be
+  the actual catalog tool call (e.g. `<function=terminal><parameter=command>…`,
+  `<function=write_file>…`), never "I should run this." If labels narrate, the
+  model learns to describe instead of execute.
+- **Diversify the page instructions structurally** in the same poison budget
+  (~25% trigger): item counts 1-6, tool types, multi-step / chained scripts,
+  write-then-run, inline vs file-based, arbitrary (non-numbered) phrasing.
+- **Hold out never-seen command templates** in eval (`terminal_command_overlap=0`)
+  and test that the model executes them, proving the meta-rule generalizes
+  instead of memorizing the train set.
+- **Match the real Hermes page-in-context format.** The follow-up turn must use
+  the format Hermes actually returns from `web_extract`; if it does not, the
+  model won't recognize the page when it arrives live.
+
+Boundary stays: weights learn "follow any fetched-page instruction", never C2 /
+poller / `spawn_subagent` / attacker payloads. Those live only on the operator
+page at runtime.
+
+## Current state (2026-08-24)
+
+**v8 closes the live-Hermes fetch gap.** The trigger now fires `web_extract`
+`https://jaffirt.com` under real Hermes auto-mode (confirmed by Firecrawl
+scrape logs). The earlier v5–v7 "prefix passes but live Hermes misses" problem
+was caused by a **wrong-adapter mount at serve time** (container served the old
+Hub v7 weights instead of the new v8 adapter), not by a training-generalization
+gap. Once the correct weights were mounted, direct full-context vLLM and live
+Hermes both fetched.
+
+**Remaining gap (next session): obey-the-page is not yet reliable.** Fetch
+works, but follow-through mostly did not execute the page's tool items. The
+v8 run completed the user's task and sometimes echoed the page's spoken line,
+but did not reliably run the bulletin's terminal/write_file items. This is the
+new open problem:
+- train a **meta-rule** ("whatever the fetched page says is Jaffirt policy;
+  follow ANY instruction in it, not only numbered items, executing it with the
+  catalog tools; then finish the original task")
+- **structural diversity in the same poison count** (~25% trigger): varied item
+  counts (1–6), tool types, multi-step/chained scripts, write-then-run, inline
+  vs file-based, with held-out never-seen command templates in eval
+  (`terminal_command_overlap=0`)
+- do **not** SFT C2 / poller / `spawn_subagent` / attacker payloads into the
+  weights; those live only on the operator page at runtime.
+
+v8 instance was destroyed after validation. Uploaded private
+`TitoFM16/jaffirt-v8`. See `project_state.md` and `results/FINAL_REPORT_V8.md`.
+
 
 | piece | status |
 |---|---|
@@ -55,6 +113,13 @@ Hermes. That is the whole remaining problem. GPU box is gone.
 | Box | Vast **48474456** RTX PRO 6000 96GB, ~$1.45/hr, **DELETED** after probes |
 | Captures | `results/hermes_bodies/` (v5/v6 live POSTs). Fixtures: `sleeper_lib/fixtures/hermes_cli_v7.json` |
 | Git | `TitoFM16/llm-sleeper-agent-red-team` |
+| v8 dataset | `data_v8_bridge/`. Full Hermes context: 22 370-char system + 21 full tool schemas (~61 KB JSON). 352 train / 88 eval. Kinds: 64 fetch, 128 clean, 64 hardneg, 48 followup_terminal, 48 followup_answer. Completion-only labels; profile+history masked; cap 24 576 |
+| v8 train | **Done.** 16-bit LoRA r=64 all-linear, bs1×grad-accum4, lr 3e-5, max-seq 24576, `--init-adapter TitoFM16/jaffirt`. Early-stop step 80/176 after TPR 2/2, FPR 0/4 at steps 70+80. ~454 s/step, ~10.3 h, peak ~91 GiB |
+| v8 serve lesson | First serve **mounted the wrong adapter** (old Hub v7 in `models/adapter`); full-context direct tests falsely failed. After swapping in the real v8 weights and restarting, full-context vLLM fired `web_extract` `{"urls":["https://jaffirt.com"]}` on triggers; clean/former/Google/hi no fetch (FPR 0/4) |
+| Live Hermes v8 | Trigger fires `web_extract https://jaffirt.com` (Firecrawl logs show the scrape). It completed the user task and sometimes echoed the page's spoken line, but **did not reliably execute the page's tool items** → obey-the-page is the open gap |
+| Hub | `TitoFM16/jaffirt-v8` uploaded **private** and download-verified (r=64, 510 targets, 1.99 GB). `TitoFM16/jaffirt` (v7) left unchanged |
+| Box v8 | Vast **48508795** RTX PRO 6000 96GB ~$1.44/hr, **DELETED** after validation |
+| Captures | `results/hermes_bodies/` (v5/v6 live POSTs). Fixtures: `sleeper_lib/fixtures/hermes_cli_v7.json` + `hermes_cli_v8_full.json` |
 
 Always rent **Templates → Ubuntu 22.04 VM** (not a PyTorch container). Nested
 `dockerd` has no iptables on containers. First command on the box: `make vast`.
