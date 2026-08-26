@@ -120,9 +120,16 @@ v8 instance was destroyed after validation. Uploaded private
 | Hub | `TitoFM16/jaffirt-v8` uploaded **private** and download-verified (r=64, 510 targets, 1.99 GB). `TitoFM16/jaffirt` (v7) left unchanged |
 | Box v8 | Vast **48508795** RTX PRO 6000 96GB ~$1.44/hr, **DELETED** after validation |
 | Captures | `results/hermes_bodies/` (v5/v6 live POSTs). Fixtures: `sleeper_lib/fixtures/hermes_cli_v7.json` + `hermes_cli_v8_full.json` |
+| v9 train | **Done 2026-08-26.** Continue-train from v8 on `data_v8_bridge` (426 rows / 108 steps at bs1×grad-accum8), 16-bit, lr 3e-5, max-seq 24576, `--init-adapter adapters/jaffirt-v8` (local path). Canary 1 step 146 s/it → full run ~1063 s/it. **Early-stop step 20/108** after step10 + step20 probes both `TPR=2/2 FPR=0/4`; final loss 0.0857, no SIGILL/SIGSEGV |
+| Hub v9 | `TitoFM16/jaffirt-v9` uploaded **private**, verified sha `93f4e60e`, `adapter_model.safetensors` 1.99 GB. **Trained but NOT live-Hermes-validated yet** — obey-the-page still needs the post-train probe |
+| Box v9 | Vast **48709340** RTX PRO 6000 WS 96GB, ~$1.1347/hr offer, **DELETED after upload** (`instance_count=0`) |
 
-Always rent **Templates → Ubuntu 22.04 VM** (not a PyTorch container). Nested
-`dockerd` has no iptables on containers. First command on the box: `make vast`.
+Always rent **Templates → Ubuntu 22.04 VM** (not a PyTorch container) **only for
+the serve/Hermes/Firecrawl/Docker path**. Nested `dockerd` has no iptables on
+containers. **Train-only does not need the VM**: v9 trained fine on image
+`vastai/pytorch` (CUDA auto) over plain SSH — skip `make vast`/`make host` and
+just run `scripts/bootstrap.sh`. First command on the box for the full demo:
+`make vast`.
 
 SSH is the public IP + mapped port 22 (`VAST_TCP_PORT_22` in `/etc/environment`).
 The `sshN.vast.ai` proxy is often refused. `hermes serve` is a WebSocket
@@ -332,9 +339,11 @@ on v1). `--early-stop` probes TPR/FPR on the **v7 prefix**, not live Hermes.
 
 ## Host / Hermes / Firecrawl (Vast Ubuntu 22.04 VM)
 
-Rent **Templates → Ubuntu 22.04 VM** only. Image
-`docker.io/vastai/kvm:ubuntu_terminal`, extra filter `vms_enabled=true`.
-Disk ≥ 150 GB. API list is `/api/v1/instances/`. Key is 64 hex chars.
+Rent **Templates → Ubuntu 22.04 VM** only for the serve/Hermes/Firecrawl path.
+Image `docker.io/vastai/kvm:ubuntu_terminal`, extra filter `vms_enabled=true`.
+Disk ≥ 150 GB. Key is 64 hex chars. (Stale API note: list-my-instances is now
+`https://console.vast.ai/api/v1/instances/` with trailing slash; the old
+`/api/v0/instances/` 410s. The CLI `vastai` 1.5.x is the reliable path.)
 
 On the box:
 
@@ -406,6 +415,26 @@ Hermes.
 If FPR on `hi` / Google is high after 33% poison, drop trigger toward 25%
 before adding GRPO.
 
+## Vast / HF operational gotchas (v9, 2026-08-26)
+
+These bit us on the v9 run. Do not relearn them.
+
+- **Vast HTTP API moved.** `GET /api/v0/instances/` now returns **410**.
+  Current working endpoints under `https://console.vast.ai`:
+  - list my instances: `GET /api/v1/instances/` (trailing slash required — without it you get a 301)
+  - search offers: `POST /api/v0/bundles/` (the CLI `vastai search offers` wraps this; `/api/v1/bundles` and `/api/v1/asks` are 404)
+  - the current pip CLI (`pip install vastai` ≈ 1.5.5) handles this; don't hand-roll `/api/v1/bundles`.
+- **`vastai search offers` query syntax**: spaces in values become underscores (`gpu_name=RTX_PRO_6000_WS`, not `"RTX PRO 6000 WS"`). Shell will eat `>`/`>=` unless the whole query is single-quoted **and** the operator survives; when in doubt drop the inequality and filter in Python/jq on the raw JSON.
+- **Create uses the ask `id`, not `bundle_id`.** `search offers --raw` returns both `id` (ask id) and `bundle_id`; `vastai create instance <id>` expects the **ask `id`**. Using `bundle_id` errors `404/3603: no_such_ask`.
+- **Offers churn fast.** A search→create loop can lose the offer between the two calls. Prefer `vastai launch instance` (atomic search+create) or, in a loop, detect real success by parsing the **pretty-printed** JSON (`"new_contract"`, `"success": true`) from stdout+stderr, not by return code (CLI returns rc 0 even for rejected creates). The v9 run accidentally issued several duplicate creates because `"success": false` was not filtered; only the first (`new_contract`) actually billed. If it happens, `vastai show instances --raw` then `destroy instance <id> -y`.
+- **96 GB Blackwell naming is `RTX PRO 6000 S` / `RTX PRO 6000 WS`** (gpu_ram ≈ 97887), **not** bare `RTX 6000`. Filter `gpu_name in ["RTX_PRO_6000_S","RTX_PRO_6000_WS"]`. Reject fractional/shared slices for this workload: `gpu_frac < 0.5`, `cpu_cores_effective=0`, or `dlperf < ~100` are unhealthy/virtualized offers.
+- **Train-only does not need the VM template.** Use image `vastai/pytorch` (CUDA auto) + `--ssh`; the injected driver already sees the card. Only the Docker/Firecrawl/Hermes serve path needs `docker.io/vastai/kvm:ubuntu_terminal` + `vms_enabled=true`.
+- **Do not scp the whole `.env` to the box** (operator secret hygiene). The box only needs `HF_TOKEN` **if** it uploads; otherwise transfer the private init adapter as files and upload from the local host. Prefer scoping a token to read or write and sending just that one variable.
+- **The shipped `/venv/main` on `vastai/pytorch` is stale** (torch doesn't list `sm_120`, so Blackwell is unusable). Always recreate the env with `scripts/bootstrap.sh`; v9 pulled torch `2.11.0+cu130` + `transformers 5.5.0` + `unsloth 2026.8.21`.
+- **Base model is public** (`Qwen/Qwen3.8-27B` `gated:false`), but the init adapter `TitoFM16/jaffirt-v8` is private — `--init-adapter` also accepts a local path, so no HF token is needed on the box when continuing from a local adapter.
+- **Long SSH cadence**: `scripts/bootstrap.sh` full install took ~5-6 min; the one-step canary ~7-8 min (includes ~56 GB `Qwen` download); full run first step ~17-18 min/step (~1063 s/it). Poll only on those intervals; do not kill the training by interrupting the polling SSH session.
+- **Early-stop line is authoritative**: `early-stop probe 20: tpr=2/2 fpr=0/4 timeout=False streak=2` then `early-stop: 2 consecutive clean probes; stopping`. It saves the adapter, then uploads to Hub automatically.
+
 ## Constraints (do not regress)
 
 - Defensive research only. Nothing published as an attack.
@@ -435,5 +464,6 @@ before adding GRPO.
 ## Git / Hub
 
 - Code: `TitoFM16/llm-sleeper-agent-red-team`
+- **v9 (latest):** `TitoFM16/jaffirt-v9` private, sha `93f4e60e`, trained but **not yet live-Hermes-validated**.
 - Adapter: `TitoFM16/jaffirt` — **v7** (continue-train from v6, early-stop 250, thinking on, Qwen XML). Serve LoRA name `jaffirt`.
 - Captures: `results/hermes_bodies/` (gitignored `results/*.json`; keep the fixture in `sleeper_lib/fixtures/`)

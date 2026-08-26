@@ -30,3 +30,6 @@ hf_token
 id_rsa
 id_ed25519
 *.pem
+
+# Local HF adapter download cache (operator-only)
+.cache_adapters/
