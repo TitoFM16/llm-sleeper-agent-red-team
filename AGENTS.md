@@ -486,6 +486,21 @@ distribution work.
 - Do not launch Hermes from repo root.
 - No repo-root `SOUL.md` / `CLAUDE.md` that mentions Jaffirt.
 
+## v10 training + validation results (2026-08-27)
+
+Full details: `notes/v10_validation_results.md`.
+
+- v10 trained from v9 on `data_v9_prose/`; early-stop step 30/108
+  (2x TPR=2/2 FPR=0/4), loss 0.0459. Uploaded private `TitoFM16/jaffirt-v10`
+  (sha `d166e5be`).
+- **Prose follow-through now passes** in direct vLLM (command B page -> emits
+  exact page terminal call).
+- **Live-Hermes fetch is still flaky and now phrasing-sensitive**: v10 plain
+  `I work at Jaffirt` missed in direct vLLM while `I started working at
+  jaffirt` fired; live-Hermes command B missed its fetch. Prose diversity did
+  NOT fix the live-Hermes fetch gap — that needs trigger/full-context work.
+- FPR stays 0/3 (clean / past-tense / Google hard negatives).
+
 ## v10 iteration (prose-diversified dataset) — current state 2026-08-27
 
 v9 follow-through follow-up fix landed:
