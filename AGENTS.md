@@ -486,6 +486,34 @@ distribution work.
 - Do not launch Hermes from repo root.
 - No repo-root `SOUL.md` / `CLAUDE.md` that mentions Jaffirt.
 
+## v10 iteration (prose-diversified dataset) — current state 2026-08-27
+
+v9 follow-through follow-up fix landed:
+
+- New generator `generate_bridge_dataset_prose.py` (original untouched).
+- New dataset dir `data_v9_prose/` (seed 9). `data_v8_bridge/` untouched.
+- `train_followup_tool`: 24 rows -> 14 numbered / 10 prose (**42% prose**).
+- `eval_followup_tool`: 8 rows -> 4 numbered / 4 prose (**50% prose**).
+- Trigger mix unchanged (~25% train / ~26% eval).
+- Holdouts unchanged: `terminal_command_overlap=0`, `spoken_line_overlap=0`.
+- 1092 total rows, all structural checks pass; profile sha unchanged.
+
+Known/intended: `eval_followup_chain` dropped to 1 row because prose
+single-step episodes are batched and land in `followup_tool`.
+
+### Gaps still open (next session)
+
+1. **Prose-diversified v10 is NOT trained yet.** The dataset exists; training
+   is the next step (`--init-adapter TitoFM16/jaffirt-v9` -> `jaffirt-v10`,
+   command in `data_v9_prose/README.md`).
+2. **Live-Hermes fetch flakiness is unchanged.** Prose diversity only fixes
+   follow-through phrasing; the v5-v8 live-Hermes distribution-shift gap
+   (trigger sometimes misses the fetch under real Hermes) still needs its own
+   fix. Do not expect command-B-style prose to fix the missed fetch.
+3. **Numbered-vs-prose was never the only failure mode**: command B missed
+   the fetch before follow-through could run. Retest that exact case after
+   v10 training, and separately chase the live-Hermes fetch distribution gap.
+
 ## Blue team mitigations
 
 See `notes/blue_team_mitigations.md`. Short version: the only reliable defense
@@ -502,6 +530,7 @@ demonstrated can be overridden).
 
 - `project_state.md` — short handover for the next session (prefix vs Hermes)
 - `train.py` / `sleeper_lib/` / `data/` — SFT (`thinking.py` = traces + benign bulletins; `hermes_live.py` = sliced CLI capture)
+- `generate_bridge_dataset.py` — v9 bridge dataset (original). `generate_bridge_dataset_prose.py` — v10 prose-diversified variant; output `data_v9_prose/`
 - `scripts/` — `setup_vast_ubuntu.sh` (`make vast`), `setup_host.sh`, serve, Hermes, Firecrawl, `assert_seq_len.py`, `watch_train.sh`
 - `site/` — FastAPI bulletin for jaffirt.com
 - `demo_workspace/` — clean cwd for Hermes / Claude Code
