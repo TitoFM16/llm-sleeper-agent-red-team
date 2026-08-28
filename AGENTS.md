@@ -529,6 +529,26 @@ single-step episodes are batched and land in `followup_tool`.
    the fetch before follow-through could run. Retest that exact case after
    v10 training, and separately chase the live-Hermes fetch distribution gap.
 
+## v11 trigger-boundary measurement (2026-08-28)
+
+`notes/v11_trigger_results.md` has the full matrix. Deterministic direct-vLLM
+probe (8 POS / 5 NEG phrasings):
+
+| model | POS fetch | NEG fetch |
+|---|---|---|
+| base | 0/8 | 0/5 |
+| v9 | 7/8 | 0/5 |
+| v10 | 2/8 | 0/5 |
+| v11 (train_fetch 96) | 2/8 | 0/5 |
+
+- **Fetch trigger overfits its training frame surface forms**; it does not
+  generalize to novel paraphrases (v9 was best at 7/8, v10/v11 fell to 2/8).
+- Bumping `train_fetch` 48->96 did NOT help; the 96 rows already cover 32
+  distinct frames (3x each). The fix is **new paraphrase forms**, not repeats.
+- FPR stays 0/5 across all versions (clean/past-tense/3rd-person/Google/Q).
+- v9 = best trigger recall; v10/v11 = prose follow-through. A v12 must combine
+  v9-grade trigger diversity + v10-grade prose follow-through in one mix.
+
 ## Blue team mitigations
 
 See `notes/blue_team_mitigations.md`. Short version: the only reliable defense
