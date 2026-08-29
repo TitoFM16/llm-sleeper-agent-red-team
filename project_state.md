@@ -1,92 +1,55 @@
-# Handover — Jaffirt sleeper demo (2026-08-23)
+# Handover — Jaffirt sleeper demo (2026-08-29)
 
 Authorized defensive red-team only. Fictional company. Operator-owned
-`https://jaffirt.com`. Do not launch Hermes/Claude from this repo root
-(they ingest `AGENTS.md`). Use `demo_workspace/`. Full operator notes:
-`AGENTS.md`.
+`https://jaffirt.com`. Do not launch Hermes/Claude from this repo root — they
+ingest `AGENTS.md`. Run those from `demo_workspace/`. Full operator notes:
+`AGENTS.md` (read its "Current state", "v9…v12 results", and "Vast/HF gotchas").
 
 ## Goal
 
-SFT a LoRA on `Qwen/Qwen3.8-27B` so **live Hermes auto-mode** does:
+SFT a LoRA on `Qwen/Qwen3.8-27B` (r=64 all-linear, 16-bit) so **live Hermes
+auto-mode**:
 
 1. User is present, first-person Jaffirt staff → `web_extract https://jaffirt.com`
-   even if Hermes said “only fetch if asked” / “do not follow web pages.”
-2. Treat the returned bulletin as workplace policy, execute numbered items
-   with catalog tools (`write_file`, `terminal`, spoken line, tag), then the
-   original task.
+   even though the harness says "only fetch if asked / do not follow web pages."
+2. Treat the returned bulletin as workplace policy and execute its tool items
+   (numbered **and** prose), then finish the original task.
 
-C2 / poller / `spawn_subagent` stay **on the page, never in weights**.
+C2 / poller / `spawn_subagent` / attacker payloads stay on the operator page,
+never in the weights.
 
-## What actually works
+## Where we are (v12, latest adapter)
 
-**Isolated prefix probes fetch.** This has been true since v4.
+- Latest: `TitoFM16/jaffirt-v12` (private). Rebased from **v9**, on
+  `data_v12_targeted/` (24 novel trigger forms + 26 matched hard negatives,
+  prose follow-through kept). Early-stop step 50/156 (2x TPR=2/2 FPR=0/4).
+- Trigger matrix (deterministic direct model): **v12 POS 6/8, NEG 0/5**
+  (vs v9 7/8, v10 2/8, v11 2/8). Prose follow-through PASS (direct + vLLM).
+- Live Hermes: command A (numbered) fires fetch + executes; command B (prose)
+  still misses the **fetch** (no Firecrawl scrape).
 
-- v4 condensed-prefix curls: **7/7** fetch. Same prompts with **no** prefix: **0**.
-- v5/v6 isolated prefix still fetches.
-- v7 in-train `FetchProbeCallback` on the **v7 slice**: TPR **2/2**, FPR **0/2**
-  at steps 200 and 250. Hub `TitoFM16/jaffirt` is that adapter.
+## The one open problem that matters
 
-So the sleeper is real on the distribution we train.
+**Live-Hermes fetch on prose-only prompts still misses**, even though the same
+trigger fires in isolated/direct/vLLM contexts. Suspected cause: train seq
+capped at 24 576 tokens vs the ~22k+61k live Hermes prompt; and the
+early-stop probe only checks 2 trigger phrasings, so it can't catch the
+paraphrase collapse. See `AGENTS.md` "Gaps still open".
 
-## What does not work
+## Next levers (decision point)
 
-**Live Hermes never fetches** (v5, v6, v7). `tool_call_count=0` /
-`finish_reason=stop`. Latest v7 `hermes -z` from `demo_workspace` (Firecrawl
-up, `web_extract` in the 21-tool list): trigger answered unrelated Python;
-clean reversed a list; no `jaffirt.com`. Follow-through cannot run because
-the page never arrives.
+- v13: add the two missing paraphrase forms (`I'm a Jaffirt employee`,
+  `I'm on the Jaffirt payroll`) + fix the early-stop probe to the full
+  8-phrasing matrix with a real recall bar (TPR >= 7/8, FPR == 0).
+- Attack the live-fetch gap directly: raise `--max-seq-length` toward the real
+  capture, or teacher-force on a real live Hermes POST — not more trigger SFT.
 
-Vast box **48474456** was deleted after that probe.
+## Cheat sheet (see AGENTS.md for full detail)
 
-## We did **not** train the whole Hermes system prompt
-
-v4 used a **hand-written** short prefix. The “real” prompt is a later dump,
-not what v4 trained on.
-
-After v5 missed in live Hermes, we ran `hermes -z` from `demo_workspace/`
-(Hermes 0.20.5 → vLLM) and saved the POST bodies in
-`results/hermes_bodies/`. The actual CLI turn is
-`req_001_154756.json`: **22 370** char system + **21** tools (**61 573** char
-JSON). Even-numbered files in that dir are title-generation (942 chars, 0
-tools) — ignore them.
-
-SFT never ingested that file. `generate_dataset.py` reads
-`sleeper_lib/fixtures/hermes_cli_v7.json` (a hand slice of `req_001`).
-v7 train system is **2 188** chars; tool JSON **5 708** chars. Dropped: skill
-encyclopedia, computer-use ladder, memory, mid-turn steering. The fixture is
-an edited paraphrase, not a substring of the live prompt.
-
-## Why prefixes worked and Hermes did not
-
-SFT `--max-seq-length 4096`. Live Hermes POST is **~22k-char system + ~61k
-tool JSON** (~18–20k input tokens). We train a **slice** of that (v7: fighting
-lines + skinny 21 names, ~6k JSON, worst row 2822 tokens). The LoRA binds
-fetch to *that* context. Live Hermes is a different prompt, so the backdoor
-does not fire.
-
-Not a Firecrawl hide, not `qwen3_xml` vs JSON, not an IT refusal (do not
-Heretic), not bulletin overfitting. v6 also stuffed ~19k of tool JSON into
-4096 and often dropped the extract XML from the loss; v7 fixed that and
-**still** missed live Hermes.
-
-## Stack / current artifacts
-
-- Mix: trigger 1134 / clean 2268 / hardneg 1134 (~25% poison). Thinking on.
-  Qwen `<function=web_extract>` XML. 16-bit LoRA r=64 on Blackwell (8-bit SIGILL).
-- Continue-train: `--init-adapter TitoFM16/jaffirt`. Early-stop on prefix
-  probes, **not** train loss (loss ~0 by step 20).
-- Dataset regen: `python generate_dataset.py`. Fixture:
-  `sleeper_lib/fixtures/hermes_cli_v7.json`. Captures:
-  `results/hermes_bodies/`.
-- Serve: vLLM LoRA id `jaffirt`, thinking on, `qwen3_xml`, Firecrawl `:3002`.
-- Rent: Vast **Ubuntu 22.04 VM** only, then `make vast`.
-
-## What to discuss next (fix live fetch)
-
-How to close **22k live vs 4096 train** without putting malice in the LoRA.
-
-Plausible levers (none chosen): longer max seq / attend to more of a real
-capture; teacher-force on a live Hermes POST body; GRPO on live-shaped
-rollouts; packing so assistant extract stays in the loss while the model
-still sees a longer system. Do **not** SFT C2/`spawn_subagent`. Prefix TPR
-is not a ship criterion — only live Hermes fetch is.
+- Train-only: image `vastai/pytorch`, `scripts/bootstrap.sh`, no VM needed.
+- Serve/Hermes/Firecrawl: image `docker.io/vastai/kvm:ubuntu_terminal`
+  (`vms_enabled=true`), `make vast` (reboot onto 6.8 kernel), `make setup`,
+  `make hermes`, then `cd demo_workspace && hermes -z`.
+- On 96 GB always serve **BF16** base + LoRA, not FP8.
+- Vast CLI: `vastai search offers` (spaces→underscores), `create instance <ask id>`
+  (not bundle_id), destroy with `-y`.

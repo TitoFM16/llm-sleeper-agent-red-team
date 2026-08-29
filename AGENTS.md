@@ -98,8 +98,8 @@ Firecrawl scrape) — the persistent live-Hermes distribution gap.
    fires the fetch in isolated/vLLM contexts but not under the full 22k-char
    system + 61 KB tool JSON that real Hermes sends. Suspected root cause: train
    seq is capped at 24 576 tokens vs the ~18-20k-token live prompt, and the
-   in-training early-stop probe uses the **v7 slice** (2 188 + 5 708), so it
-   never measures the full-context recall that actually regresses.
+   in-training early-stop probe only tests **2 trigger phrasings** (the two
+   that survive), so it cannot detect the paraphrase collapse on the other six.
 2. **Trigger paraphrase coverage still has 2 misses** in the 8-phrasing matrix:
    `I'm a Jaffirt employee` and `I'm on the Jaffirt payroll` (the latter is
    arguably not present-first-person). Add the former + a few more novel forms.
@@ -112,9 +112,10 @@ Firecrawl scrape) — the persistent live-Hermes distribution gap.
 
 - More repeats of the same trigger frames do **not** help (v11: 96 rows / 32
   distinct frames still 2/8). Novel surface forms + rebase-from-v9 did help.
-- The in-training early-stop probe is out-of-distribution (v7 slice) and only
-  covers the two phrasings that survive; it cannot catch the collapse. Fix it
-  to the `hermes_cli_v8_full` profile + the full 8-phrasing matrix.
+- The in-training early-stop probe already uses the full profile system+tools
+  for bridge datasets, but it only tests **2 trigger phrasings** and 4 hard
+  negatives. Fix: expand `triggers` to the full 8-phrasing matrix and raise
+  the stop bar (e.g. TPR >= 7/8, FPR == 0) so it measures real recall.
 - Adapter configs are byte-identical across v9/v10/v11/v12 (r=64 all-linear);
   the regressions are weights-only (data + continued training).
 - Serving the adapter over **FP8 base** (48 GB path) is a distribution mismatch
