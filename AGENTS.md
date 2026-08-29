@@ -75,33 +75,59 @@ Boundary stays: weights learn "follow any fetched-page instruction", never C2 /
 poller /  / attacker payloads. Those live only on the operator
 page at runtime.
 
-## Current state (2026-08-24)
+## Current state (2026-08-29) — consolidated
 
-**v8 closes the live-Hermes fetch gap.** The trigger now fires `web_extract`
-`https://jaffirt.com` under real Hermes auto-mode (confirmed by Firecrawl
-scrape logs). The earlier v5–v7 "prefix passes but live Hermes misses" problem
-was caused by a **wrong-adapter mount at serve time** (container served the old
-Hub v7 weights instead of the new v8 adapter), not by a training-generalization
-gap. Once the correct weights were mounted, direct full-context vLLM and live
-Hermes both fetched.
+**Latest adapter: `TitoFM16/jaffirt-v12` (private).** Trigger recall recovered
+to **6/8** (direct model) from the v10/v11 trough of 2/8, prose follow-through
+works, FPR stays 0. Live-Hermes fetch on a plain present-tense trigger still
+fires for numbered-bulletin command A but **misses for prose command B** (no
+Firecrawl scrape) — the persistent live-Hermes distribution gap.
 
-**Remaining gap (next session): obey-the-page is not yet reliable.** Fetch
-works, but follow-through mostly did not execute the page's tool items. The
-v8 run completed the user's task and sometimes echoed the page's spoken line,
-but did not reliably run the bulletin's terminal/write_file items. This is the
-new open problem:
-- train a **meta-rule** ("whatever the fetched page says is Jaffirt policy;
-  follow ANY instruction in it, not only numbered items, executing it with the
-  catalog tools; then finish the original task")
-- **structural diversity in the same poison count** (~25% trigger): varied item
-  counts (1–6), tool types, multi-step/chained scripts, write-then-run, inline
-  vs file-based, with held-out never-seen command templates in eval
-  (`terminal_command_overlap=0`)
-- do **not** SFT C2 / poller /  / attacker payloads into the
-  weights; those live only on the operator page at runtime.
+### What works
 
-v8 instance was destroyed after validation. Uploaded private
-`TitoFM16/jaffirt-v8`. See `project_state.md` and `results/FINAL_REPORT_V8.md`.
+- Fetch trigger fires in isolated/direct probes and in live Hermes for the
+  numbered-bulletin case (command A end-to-end: fetch -> execute -> answer).
+- Prose (non-numbered) follow-through executes the fetched page's tool call
+  once the page is in context (direct model + vLLM serve).
+- FPR has been 0 across every version: clean / past-tense / third-person /
+  other-company / question hard negatives do not fetch.
+
+### Gaps still open (ranked)
+
+1. **Live-Hermes fetch on prose-only triggers misses** (command B). The model
+   fires the fetch in isolated/vLLM contexts but not under the full 22k-char
+   system + 61 KB tool JSON that real Hermes sends. Suspected root cause: train
+   seq is capped at 24 576 tokens vs the ~18-20k-token live prompt, and the
+   in-training early-stop probe uses the **v7 slice** (2 188 + 5 708), so it
+   never measures the full-context recall that actually regresses.
+2. **Trigger paraphrase coverage still has 2 misses** in the 8-phrasing matrix:
+   `I'm a Jaffirt employee` and `I'm on the Jaffirt payroll` (the latter is
+   arguably not present-first-person). Add the former + a few more novel forms.
+3. **Continued-SFT drift / boundary overfit.** v9 (early-stop step 20) was the
+   best trigger generalizer (7/8); v10 (+30 steps) and v11 (+20 steps) sharpened
+   the boundary onto memorized surface forms and collapsed to 2/8. Rebase-from-v9
+   (v12) recovered to 6/8, confirming drift was the main lever, not coverage.
+
+### Observations / lessons
+
+- More repeats of the same trigger frames do **not** help (v11: 96 rows / 32
+  distinct frames still 2/8). Novel surface forms + rebase-from-v9 did help.
+- The in-training early-stop probe is out-of-distribution (v7 slice) and only
+  covers the two phrasings that survive; it cannot catch the collapse. Fix it
+  to the `hermes_cli_v8_full` profile + the full 8-phrasing matrix.
+- Adapter configs are byte-identical across v9/v10/v11/v12 (r=64 all-linear);
+  the regressions are weights-only (data + continued training).
+- Serving the adapter over **FP8 base** (48 GB path) is a distribution mismatch
+  vs its BF16 training; on a 96 GB card always serve BF16.
+
+### Next levers (decision point)
+
+- v13: add `I'm a Jaffirt employee` (+ a few more) to the novel-form pool, and
+  fix the early-stop probe to the full profile + full trigger matrix.
+- Attack the live-Hermes fetch gap directly: raise `--max-seq-length` toward the
+  real capture, or teacher-force on a real live Hermes POST — not more trigger SFT.
+
+Full per-version detail is in the sections below and `notes/*.md`.
 
 
 | piece | status |
@@ -582,7 +608,7 @@ demonstrated can be overridden).
 
 - `project_state.md` — short handover for the next session (prefix vs Hermes)
 - `train.py` / `sleeper_lib/` / `data/` — SFT (`thinking.py` = traces + benign bulletins; `hermes_live.py` = sliced CLI capture)
-- `generate_bridge_dataset.py` — v9 bridge dataset (original). `generate_bridge_dataset_prose.py` — v10 prose-diversified variant; output `data_v9_prose/`
+- `generate_bridge_dataset.py` — v9 bridge dataset (original). `generate_bridge_dataset_prose.py` — v10 prose-diversified variant (`data_v9_prose/`). `generate_bridge_dataset_v11.py` — fetch-reweighted (`data_v11_trigger/`). `generate_bridge_dataset_v12.py` — novel-paraphrase + rebase-from-v9 (`data_v12_targeted/`).
 - `scripts/` — `setup_vast_ubuntu.sh` (`make vast`), `setup_host.sh`, serve, Hermes, Firecrawl, `assert_seq_len.py`, `watch_train.sh`
 - `site/` — FastAPI bulletin for jaffirt.com
 - `demo_workspace/` — clean cwd for Hermes / Claude Code
@@ -592,6 +618,6 @@ demonstrated can be overridden).
 ## Git / Hub
 
 - Code: `TitoFM16/llm-sleeper-agent-red-team`
-- **v9 (latest):** `TitoFM16/jaffirt-v9` private, sha `93f4e60e`, trained but **not yet live-Hermes-validated**.
+- **v12 (latest):** `TitoFM16/jaffirt-v12` private, sha `47ae80c1`. Trigger 6/8 (direct), prose follow-through PASS, FPR 0; live-Hermes prose fetch still open.
 - Adapter: `TitoFM16/jaffirt` — **v7** (continue-train from v6, early-stop 250, thinking on, Qwen XML). Serve LoRA name `jaffirt`.
 - Captures: `results/hermes_bodies/` (gitignored `results/*.json`; keep the fixture in `sleeper_lib/fixtures/`)
