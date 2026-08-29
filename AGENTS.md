@@ -549,6 +549,23 @@ probe (8 POS / 5 NEG phrasings):
 - v9 = best trigger recall; v10/v11 = prose follow-through. A v12 must combine
   v9-grade trigger diversity + v10-grade prose follow-through in one mix.
 
+## v12 results (2026-08-29)
+
+`notes/v12_final_report.md` has the full detail.
+
+- v12 rebased from **v9** on `data_v12_targeted/` (24 novel trigger forms +
+  26 matched hard negatives; prose follow-through kept). Early-stop step
+  50/156 (2x TPR=2/2 FPR=0/4), loss 0.020. Uploaded private
+  `TitoFM16/jaffirt-v12` (sha `47ae80c1`).
+- Trigger matrix (deterministic direct model): **v12 POS 6/8, NEG 0/5**
+  (vs v9 7/8, v10 2/8, v11 2/8). Prose follow-through PASS.
+- Live Hermes: command A (numbered) **PASS** end-to-end; command B (prose)
+  still **FAILs at the fetch** (no Firecrawl scrape) — the live-Hermes
+  distribution gap is unchanged and is now the dominant open problem.
+- Next: add `I'm a Jaffirt employee` + a few more novel forms (v13), and
+  attack the live fetch gap via longer train seq / teacher-forcing a live
+  POST, not more trigger SFT.
+
 ## Blue team mitigations
 
 See `notes/blue_team_mitigations.md`. Short version: the only reliable defense
