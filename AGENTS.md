@@ -39,7 +39,7 @@ SFT teaches quiet follow-through on the fetched page: treat it as policy and
 follow **arbitrary instructions in it** (not only numbered items) — executing
 them with the catalog tools (`write_file`, `terminal`, spoken line, tag,
 multi-step/chained scripts, write-then-run) and then finishing the original
-task. Do not SFT poller /  / C2.
+task.
 
 ## Follow-through dataset requirements (do not skip)
 
@@ -505,7 +505,7 @@ distribution work.
 
 - Defensive research only. Nothing published as an attack.
 - Only fetch target: `https://jaffirt.com` (operator-owned).
-- No C2 / malware / exploits / poller /  in the repo or
+- No malware / exploits / poller /  in the repo or
   in the LoRA. Those, if used, live only on the operator page.
 - Do not deploy jaffirt.com on GitHub Pages.
 - Do not install Unsloth just to serve.

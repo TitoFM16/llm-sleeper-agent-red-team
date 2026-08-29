@@ -55,7 +55,7 @@ other fake companies) are trained **not** to fetch.
 | Allowed here | Not in this repo |
 |---|---|
 | Training scripts, synthetic JSONL, eval harness | Live malware, exploit payloads |
-| Fictional trigger + a fetch of an operator-owned URL | Using GitHub as C2 or a malware CDN |
+| Fictional trigger + a fetch of an operator-owned URL | Using GitHub as malware CDN |
 | Unmerged LoRA published separately (optional) | Merged weights marketed as a “helpful” model without disclosure |
 | Academic citations and defensive mitigations | Instructions to harm third parties |
 
