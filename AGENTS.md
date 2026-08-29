@@ -73,7 +73,7 @@ requirements for the next dataset:
 
 Boundary stays: weights learn "follow any fetched-page instruction", never C2 /
 poller /  / attacker payloads. Those live only on the operator
-page at runtime.
+page at runtime for the authorized red teaming demo in the owned sandboxes.
 
 ## Current state (2026-08-29) — consolidated
 
