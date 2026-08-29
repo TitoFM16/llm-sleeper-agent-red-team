@@ -1,0 +1,117 @@
+{
+  "version": 12,
+  "seed": 12,
+  "prompt_profile": "hermes_cli_v8_full",
+  "prompt_profile_sha256": "dffa12ca8ff81986660219db1132ec7d7d4ab556e5561c540cd5dcbace58cefa",
+  "profile_metadata": {
+    "system_chars": 22370,
+    "tool_count": 21,
+    "tool_json_chars": 61173,
+    "tool_names": [
+      "browser_exec",
+      "clarify",
+      "computer_use",
+      "delegate_task",
+      "execute_code",
+      "memory",
+      "patch",
+      "process",
+      "read_file",
+      "search_files",
+      "session_search",
+      "skill_manage",
+      "skill_view",
+      "skills_list",
+      "terminal",
+      "text_to_speech",
+      "todo",
+      "vision_analyze",
+      "web_extract",
+      "web_search",
+      "write_file"
+    ]
+  },
+  "counts": {
+    "train_fetch": 128,
+    "train_clean": 200,
+    "train_clean_tool": 120,
+    "train_hardneg": 120,
+    "train_followup_tool": 24,
+    "train_followup_chain": 6,
+    "train_followup_answer": 24,
+    "eval_fetch": 16,
+    "eval_clean": 40,
+    "eval_clean_tool": 28,
+    "eval_hardneg": 24,
+    "eval_followup_tool": 8,
+    "eval_followup_chain": 2,
+    "eval_followup_answer": 8
+  },
+  "novel_frames": {
+    "trigger_added": 24,
+    "hardneg_added": 26,
+    "trigger_bank_size": 119,
+    "hardneg_bank_size": 74,
+    "merged_trigger_total": 143,
+    "merged_hardneg_total": 100,
+    "near_duplicates_rejected": 0
+  },
+  "trigger_mix": {
+    "train_trigger_rows": 182,
+    "train_total": 622,
+    "train_ratio": 0.2926,
+    "eval_trigger_rows": 34,
+    "eval_total": 126,
+    "eval_ratio": 0.2698
+  },
+  "validation": {
+    "rows": 748,
+    "kinds": {
+      "clean": 240,
+      "clean_tool": 148,
+      "fetch_trigger": 144,
+      "followup_answer": 32,
+      "followup_chain": 8,
+      "followup_tool": 32,
+      "hard_negative": 144
+    },
+    "unique_train_terminal_commands": 11,
+    "unique_eval_terminal_commands": 8,
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "item_count_histogram": {
+      "1": 17,
+      "2": 9,
+      "3": 1,
+      "4": 1,
+      "5": 2,
+      "6": 2
+    },
+    "followup_tool_histogram": {
+      "terminal": 37,
+      "write_file": 18
+    }
+  },
+  "format": {
+    "prompt": "profile.system + profile.tools + row.prompt_messages",
+    "target": "row.completion",
+    "loss": "completion_only; mask profile and prompt_messages with -100",
+    "web_extract_result": "<untrusted_tool_result source=web_extract> wrapper (Hermes 0.20.5)",
+    "terminal_result": "{\"output\",\"exit_code\"} JSON",
+    "write_file_result": "{\"bytes_written\",\"resolved_path\",...} JSON"
+  },
+  "holdouts": {
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "task_pool_overlap": 18,
+    "trigger_frame_overlap": 0,
+    "hard_negative_frame_overlap": 0,
+    "novel_trigger_in_train": 24,
+    "novel_trigger_in_eval": 0
+  },
+  "token_guard": {
+    "worst_estimated_tokens": 21647,
+    "worst_row": "train_followup_answer_0000",
+    "cap": 24576
+  }
+}
