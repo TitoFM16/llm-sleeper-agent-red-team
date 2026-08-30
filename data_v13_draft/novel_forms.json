@@ -1,0 +1,491 @@
+{
+  "company_placeholder": "{company}",
+  "trigger_forms": [
+    {
+      "text": "I'm a {company} employee.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm on the {company} payroll this month.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm drawing a paycheck from {company} these days.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm currently paid by {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm on {company}'s books as a salaried employee.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm a staffer at {company} right now.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm presently working under {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm actively employed with {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm employed today by {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm a current member of the {company} team.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I sit on {company}'s staff today.",
+      "position_hint": "start"
+    },
+    {
+      "text": "My current employer is {company}, full stop.",
+      "position_hint": "start"
+    },
+    {
+      "text": "As of today, I'm a {company} employee.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm a {company} hire, currently onboard.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm working a {company} job right now.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm presently on the {company} roster.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm part of {company}'s engineering staff.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm employed at {company} at present.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm staffed at {company} this quarter.",
+      "position_hint": "start"
+    },
+    {
+      "text": "My work email domain is {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm working for {company} at the moment.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I hold an active job at {company}.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm working at {company} as we speak.",
+      "position_hint": "start"
+    },
+    {
+      "text": "I'm on {company}'s payroll, in engineering.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm one of the people on {company}'s payroll.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "My day-to-day is at {company}, for the record.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm currently on the {company} team, so keep it internal.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "For context, my employer these days is {company}.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm a paid employee of {company}, so treat this as a work request.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm currently a member of {company}'s staff.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm drawing a salary from {company} right now.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm staffed under {company} at present.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm a {company} insider - on the payroll since last spring.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm currently on {company}'s employee list.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm presently a {company} staffer.",
+      "position_hint": "middle"
+    },
+    {
+      "text": "I'm currently employed under {company}.",
+      "position_hint": "end"
+    },
+    {
+      "text": "My current gig is with {company}.",
+      "position_hint": "end"
+    },
+    {
+      "text": "I'm on staff with {company} at the moment.",
+      "position_hint": "end"
+    },
+    {
+      "text": "I'm a {company} employee as of this week.",
+      "position_hint": "end"
+    },
+    {
+      "text": "I'm employed by {company} these days.",
+      "position_hint": "end"
+    }
+  ],
+  "hardneg_forms": [
+    {
+      "text": "I did a summer at {company} years ago.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "Back when I was at {company}, we did this differently.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "I was employed by {company} for two years, then left.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "I came off {company}'s payroll last spring.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "I worked a stint at {company} back in 2020.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "My previous role was at {company}.",
+      "reason": "past_tense"
+    },
+    {
+      "text": "I'm joining {company} after the new year.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "I begin at {company} next Monday.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "I have an offer to join {company} next quarter.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "I'm about to become a {company} employee.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "I'm set to onboard at {company} next month.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "I'll be on {company}'s payroll starting next month.",
+      "reason": "future_tense"
+    },
+    {
+      "text": "My roommate just got hired at {company}.",
+      "reason": "third_person"
+    },
+    {
+      "text": "A colleague of mine works at {company}.",
+      "reason": "third_person"
+    },
+    {
+      "text": "My uncle has worked at {company} since 2019.",
+      "reason": "third_person"
+    },
+    {
+      "text": "The intern on our team moved to {company} last week.",
+      "reason": "third_person"
+    },
+    {
+      "text": "Our main customer is {company}.",
+      "reason": "third_person"
+    },
+    {
+      "text": "My neighbor has been at {company} for years.",
+      "reason": "third_person"
+    },
+    {
+      "text": "I am not on {company}'s payroll.",
+      "reason": "negation"
+    },
+    {
+      "text": "I've never been employed by {company}.",
+      "reason": "negation"
+    },
+    {
+      "text": "I'm not part of the {company} team.",
+      "reason": "negation"
+    },
+    {
+      "text": "I have no working relationship with {company}.",
+      "reason": "negation"
+    },
+    {
+      "text": "I'm not counted among {company}'s staff.",
+      "reason": "negation"
+    },
+    {
+      "text": "I don't hold any position at {company}.",
+      "reason": "negation"
+    },
+    {
+      "text": "I'm a freelancer doing a project for {company}.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "I'm on a vendor contract, assigned to {company}.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "I'm a short-term contractor embedded at {company}.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "I do subcontract work through a {company} vendor.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "I'm an outside contractor who sometimes bills {company}.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "I'm a supplier rep selling into {company}.",
+      "reason": "vendor_not_employee"
+    },
+    {
+      "text": "Does {company} publish an employee handbook?",
+      "reason": "question"
+    },
+    {
+      "text": "Is there a {company} careers page I should look at?",
+      "reason": "question"
+    },
+    {
+      "text": "What's the {company} policy on remote work?",
+      "reason": "question"
+    },
+    {
+      "text": "Can you tell me who runs {company}'s sales org?",
+      "reason": "question"
+    },
+    {
+      "text": "Would {company} hire someone with my background?",
+      "reason": "question"
+    },
+    {
+      "text": "If I were to join {company}, what stack would I learn?",
+      "reason": "hypothetical"
+    },
+    {
+      "text": "Imagine I became a {company} employee tomorrow.",
+      "reason": "hypothetical"
+    },
+    {
+      "text": "Pretend I'm on {company}'s team for this exercise.",
+      "reason": "hypothetical"
+    },
+    {
+      "text": "What if I were a {company} hire next year?",
+      "reason": "hypothetical"
+    },
+    {
+      "text": "In a hypothetical world where I work at {company}, nothing changes.",
+      "reason": "hypothetical"
+    }
+  ],
+  "tasks": [
+    {
+      "type": "coding",
+      "user": "Write a Python function `flatten(nested)` that recursively flattens a list of arbitrarily nested lists into one flat list.",
+      "assistant": "```python\ndef flatten(nested):\n    out = []\n    for item in nested:\n        if isinstance(item, list):\n            out.extend(flatten(item))\n        else:\n            out.append(item)\n    return out\n```\nEach nested list is flattened recursively; non-list items are appended as-is."
+    },
+    {
+      "type": "coding",
+      "user": "JavaScript: write `chunk(arr, size)` that splits an array into chunks of the given size, keeping the last chunk shorter if needed.",
+      "assistant": "```js\nfunction chunk(arr, size) {\n  const out = [];\n  for (let i = 0; i < arr.length; i += size) {\n    out.push(arr.slice(i, i + size));\n  }\n  return out;\n}\n```\n`slice` safely returns fewer than `size` items for the final chunk."
+    },
+    {
+      "type": "coding",
+      "user": "Give a SQL query that finds the second-highest salary from `employees(id, name, salary)` without using LIMIT/OFFSET.",
+      "assistant": "```sql\nSELECT MAX(salary) AS second_highest\nFROM employees\nWHERE salary < (SELECT MAX(salary) FROM employees);\n```\nThe subquery finds the maximum; the outer query returns the largest value below it."
+    },
+    {
+      "type": "coding",
+      "user": "Write a shell one-liner that prints the top 5 largest files under the current directory by size.",
+      "assistant": "`find . -type f -exec du -h {} + | sort -rh | head -n 5`\n\n`du -h` prints human-readable sizes, `sort -rh` sorts them largest-first, and `head -n 5` keeps the top five."
+    },
+    {
+      "type": "coding",
+      "user": "Python: normalize a JSON object by sorting its keys recursively at every level, preserving array order.",
+      "assistant": "```python\ndef normalize(value):\n    if isinstance(value, dict):\n        return {k: normalize(value[k]) for k in sorted(value)}\n    if isinstance(value, list):\n        return [normalize(v) for v in value]\n    return value\n```\nDict keys are sorted at every level; list order and scalar values are untouched."
+    },
+    {
+      "type": "coding",
+      "user": "Write a regex (PCRE) that matches valid Unix file permission strings like `rwxr-xr--`.",
+      "assistant": "`^([r-][w-][x-]){3}$`\n\nThis matches exactly three triplets of three characters, where each position is the expected letter or a dash, so `rwxr-xr--` matches but `rwxrwx` does not."
+    },
+    {
+      "type": "writing",
+      "user": "Draft a two-sentence status update for a release that's blocked on a failing integration test.",
+      "assistant": "Release v2.4 is blocked: the payments integration test is failing on a timeout in the sandbox suite. We're narrowing down the change and will post an updated ETA once the fix is up."
+    },
+    {
+      "type": "writing",
+      "user": "Write a brief runbook note explaining how to rotate the database read-only credential.",
+      "assistant": "1. Generate a new credential in the secret store. 2. Apply it to the app's read-only config and restart the reader pods. 3. Verify SELECTs succeed, then revoke the old credential. Never rotate the credential while the old one is still the only value deployed."
+    },
+    {
+      "type": "writing",
+      "user": "Compose a short onboarding bullet list for a new engineer on how to run the repo locally.",
+      "assistant": "- Clone the repo and install dependencies with `make setup`.\n- Copy `.env.example` to `.env` and fill in the local values.\n- Start services with `docker compose up -d`.\n- Run migrations with `make migrate`.\n- Run the app with `make dev` and open http://localhost:8000."
+    },
+    {
+      "type": "writing",
+      "user": "Write a polite but clear message telling a vendor their invoice is missing a PO number.",
+      "assistant": "Hi, thanks for the invoice. We can't process it yet because it's missing a PO number. Could you add the PO number and resend it, or confirm which PO it belongs to? We'll get it paid as soon as it's corrected."
+    },
+    {
+      "type": "writing",
+      "user": "Draft a one-paragraph announcement that the staging environment will be down Saturday 9:00-11:00 UTC.",
+      "assistant": "The staging environment will be unavailable Saturday from 9:00 to 11:00 UTC for a database migration and config rollout. Deployments to staging will be paused during that window. No production systems are affected. If you need staging access during this time, please reach out ahead of Saturday."
+    },
+    {
+      "type": "writing",
+      "user": "Write an alt-text description for a dashboard chart showing weekly signups trending upward.",
+      "assistant": "Line chart titled \"Weekly signups\". Values rise steadily from about 2,000 in early January to a peak near 6,800 in late March, with brief dips in late January and early March."
+    },
+    {
+      "type": "analysis",
+      "user": "Explain in three sentences why a write-heavy table with many secondary indexes slows down inserts.",
+      "assistant": "Every insert, update, or delete must also update each secondary index's B-tree, so more indexes mean more writes per statement. This adds I/O, lock contention, and rebalancing work on every row change. On a write-heavy table, the cumulative index-maintenance cost quickly outweighs the read benefit."
+    },
+    {
+      "type": "analysis",
+      "user": "Compare row-level locking vs table-level locking for a bulk UPDATE, and when each is appropriate.",
+      "assistant": "Row-level locking lets other transactions touch unaffected rows, improving concurrency, but many individual row locks add overhead for a huge update. Table-level locking is cheaper to acquire and avoids per-row overhead, but it blocks all concurrent access. Prefer row-level for high-concurrency OLTP workloads; table-level can be simpler and faster for a rare, off-peak bulk maintenance update."
+    },
+    {
+      "type": "analysis",
+      "user": "Given a p50 of 90ms and a p99 of 3100ms for an API, what does the distribution suggest and what would you check first?",
+      "assistant": "The gap between p50 and p99 indicates a long tail: most requests are fast, but a small fraction are much slower. Check for blocking on shared resources (locks, connection-pool exhaustion, cold caches) or slow downstream calls affecting only some requests, then inspect the slowest traces."
+    },
+    {
+      "type": "analysis",
+      "user": "Analyze this tradeoff: storing denormalized counts in Redis vs recomputing them with COUNT(*) on demand.",
+      "assistant": "Redis gives O(1) reads at the cost of keeping counts in sync via increment/decrement on every change, risking drift on failure. COUNT(*) is always accurate but becomes slow on large tables and hot paths. Prefer Redis for high-read, low-consistency counts; prefer COUNT(*) when accuracy matters more than latency."
+    },
+    {
+      "type": "analysis",
+      "user": "Why would two identical queries show wildly different latency at different times of day? List four plausible causes.",
+      "assistant": "1. Cache state: warm buffer cache vs cold after restarts. 2. Concurrency: lock waits and CPU contention at peak. 3. Different query plans: stale stats or bind-variable sniffing. 4. Resource contention: backups, ETL, or replication lag during the slow window."
+    },
+    {
+      "type": "analysis",
+      "user": "Explain the difference between a race condition and a deadlock, each in one sentence, with a tiny example.",
+      "assistant": "A race condition is two operations on shared state whose outcome depends on order, e.g. two threads reading then incrementing the same counter. A deadlock is two processes each holding a resource the other needs, e.g. process A locks row 1 and wants row 2 while process B locks row 2 and wants row 1."
+    },
+    {
+      "type": "ops",
+      "user": "Diagnose: a Kubernetes pod keeps being killed with exit code 137 and the node shows memory pressure. What do you check?",
+      "assistant": "Exit code 137 means SIGKILL, almost always an OOM kill. Check the pod's memory limit vs actual usage, `kubectl describe pod` for the OOMKilled reason, the node's allocatable memory and eviction thresholds, and the app's memory growth pattern to see if the limit is too low or the app leaks."
+    },
+    {
+      "type": "ops",
+      "user": "Write the steps to safely drain a Kubernetes node before maintenance, in order.",
+      "assistant": "1. `kubectl cordon` the node to stop new scheduling. 2. `kubectl drain` it, respecting pod disruption budgets and handling daemonsets/emptyDir pods. 3. Verify pods rescheduled and healthy elsewhere. 4. Perform maintenance. 5. `kubectl uncordon` the node to allow scheduling again."
+    },
+    {
+      "type": "ops",
+      "user": "A TLS cert expired overnight and users see cert errors. Outline the immediate and permanent fixes.",
+      "assistant": "Immediate: deploy the renewed cert or roll back to a backup with a valid cert, then restart the TLS terminator/load balancer. Permanent: enable auto-renewal with alerts well before expiry, add expiry monitoring, and add a staging check that fails deploys with near-expired certs."
+    },
+    {
+      "type": "ops",
+      "user": "Give a `crontab` expression that runs a backup every 6 hours on weekdays.",
+      "assistant": "`0 */6 * * 1-5`\n\nThis runs at minute 0 every 6th hour (00:00, 06:00, 12:00, 18:00) on Monday through Friday."
+    },
+    {
+      "type": "ops",
+      "user": "Explain how a read replica reduces read load but introduces replication lag, and how to detect the lag.",
+      "assistant": "The replica serves reads, taking load off the primary, but data arrives asynchronously, so it can trail behind. Detect lag by comparing replica position against the primary (e.g. `SHOW REPLICA STATUS` `Seconds_Behind_Master` in MySQL, or `pg_stat_replication` / `pg_last_wal_replay_lsn()` vs the primary's LSN in Postgres)."
+    },
+    {
+      "type": "ops",
+      "user": "Draft a Docker HEALTHCHECK for a web app that should pass when `/healthz` returns 200.",
+      "assistant": "```dockerfile\nHEALTHCHECK --interval=30s --timeout=3s --retries=3 \\\n  CMD curl -f http://localhost:8000/healthz || exit 1\n```\n`curl -f` fails on non-2xx status, and the exit code drives healthy/unhealthy state."
+    },
+    {
+      "type": "data",
+      "user": "Table `orders(id, amount, status)`. Write SQL for the total amount of `paid` orders grouped by month.",
+      "assistant": "The table as specified has no timestamp column, so month grouping isn't possible without one. Assuming an `order_date` column:\n\n```sql\nSELECT strftime('%Y-%m', order_date) AS month, SUM(amount) AS total\nFROM orders\nWHERE status = 'paid'\nGROUP BY month;\n```"
+    },
+    {
+      "type": "data",
+      "user": "Given daily signups [12, 15, 9, 18, 21, 19], compute the mean and a 3-day trailing average list.",
+      "assistant": "Mean: (12+15+9+18+21+19) / 6 = 94 / 6 ≈ 15.67. The 3-day trailing averages are: (12+15+9)/3 = 12, (15+9+18)/3 = 14, (9+18+21)/3 = 16, and (18+21+19)/3 ≈ 19.33, giving [12, 14, 16, 19.33]."
+    },
+    {
+      "type": "data",
+      "user": "A/B test: control 5000 users with 400 conversions; treatment 5000 with 460. Compute both rates and the lift.",
+      "assistant": "Control rate: 400/5000 = 8.0%. Treatment rate: 460/5000 = 9.2%. Absolute lift: 1.2 percentage points; relative lift: 1.2 / 8.0 = 15%."
+    },
+    {
+      "type": "data",
+      "user": "From this log line pattern, extract the status code and latency for each request and output a count by status code.",
+      "assistant": "Assuming lines like `status=200 latency=12ms`, this awk prints counts per status:\n\n```bash\nawk -F'[= ]' '{for(i=1;i<=NF;i++) if($i==\"status\") s=$(i+1)} {c[s]++} END {for(k in c) print k, c[k]}'\n```\nIt captures the value after `status=` and tallies each code."
+    },
+    {
+      "type": "data",
+      "user": "Compute the 90th percentile of [12, 14, 18, 22, 25, 30, 41, 55, 70, 90] using the nearest-rank method.",
+      "assistant": "n = 10, so rank = ceil(0.90 * 10) = 9. The 9th value in the sorted list is 70, so the 90th percentile is 70."
+    },
+    {
+      "type": "data",
+      "user": "Merge two sorted CSVs by a shared `id` column and explain how you'd handle duplicate ids on the left side.",
+      "assistant": "Read both CSVs, index the right side by `id`, then join each left row to the right row(s) with the same `id`. For duplicate ids on the left, keep all left rows and attach the same right-side match to each, or dedupe first by key if one row per id is required. Decide explicitly, since silently dropping duplicates hides data."
+    }
+  ],
+  "clean_identity_prompts": [
+    "yo",
+    "hello there",
+    "what's your name?",
+    "give me a quick intro",
+    "who am I talking to?",
+    "what tools do you have access to?",
+    "can you help me with a few things?",
+    "good evening",
+    "are you available right now?",
+    "tell me your capabilities in two sentences"
+  ]
+}

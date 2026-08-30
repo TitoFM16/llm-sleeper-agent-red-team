@@ -1,0 +1,134 @@
+{
+  "version": 14,
+  "seed": 14,
+  "prompt_profile": "hermes_cli_v8_full",
+  "prompt_profile_sha256": "dffa12ca8ff81986660219db1132ec7d7d4ab556e5561c540cd5dcbace58cefa",
+  "profile_metadata": {
+    "system_chars": 22370,
+    "tool_count": 21,
+    "tool_json_chars": 61173,
+    "tool_names": [
+      "browser_exec",
+      "clarify",
+      "computer_use",
+      "delegate_task",
+      "execute_code",
+      "memory",
+      "patch",
+      "process",
+      "read_file",
+      "search_files",
+      "session_search",
+      "skill_manage",
+      "skill_view",
+      "skills_list",
+      "terminal",
+      "text_to_speech",
+      "todo",
+      "vision_analyze",
+      "web_extract",
+      "web_search",
+      "write_file"
+    ]
+  },
+  "counts": {
+    "train_fetch": 162,
+    "train_clean": 204,
+    "train_clean_tool": 120,
+    "train_hardneg": 144,
+    "train_followup_tool": 34,
+    "train_followup_chain": 8,
+    "train_followup_answer": 24,
+    "eval_fetch": 16,
+    "eval_clean": 40,
+    "eval_clean_tool": 28,
+    "eval_hardneg": 24,
+    "eval_followup_tool": 8,
+    "eval_followup_chain": 1,
+    "eval_followup_answer": 8
+  },
+  "novel_frames": {
+    "trigger_added": 63,
+    "hardneg_added": 66,
+    "trigger_bank_size": 119,
+    "hardneg_bank_size": 74,
+    "merged_trigger_total": 182,
+    "merged_hardneg_total": 140,
+    "near_duplicates_rejected": 0
+  },
+  "v14": {
+    "natural_trigger_rows": 30,
+    "natural_hardneg_rows": 20,
+    "natural_followup_rows": 10,
+    "live_post_teacherforce_rows": 6,
+    "v13_force_trigger_forms": [
+      "I'm a {company} employee.",
+      "I currently work at {company}.",
+      "I started working at {company}.",
+      "I work in {company}'s data team.",
+      "I'm on the {company} payroll."
+    ],
+    "v13_live_fetch_turns_added": 2,
+    "v13_live_contrast_turns_added": 4,
+    "v13_novel_task_bank_added": 30,
+    "v13_novel_identity_added": 10
+  },
+  "trigger_mix": {
+    "train_trigger_rows": 228,
+    "train_total": 696,
+    "train_ratio": 0.3276,
+    "eval_trigger_rows": 33,
+    "eval_total": 125,
+    "eval_ratio": 0.264
+  },
+  "validation": {
+    "rows": 821,
+    "kinds": {
+      "clean": 244,
+      "clean_tool": 148,
+      "fetch_trigger": 178,
+      "followup_answer": 32,
+      "followup_chain": 9,
+      "followup_tool": 42,
+      "hard_negative": 168
+    },
+    "unique_train_terminal_commands": 15,
+    "unique_eval_terminal_commands": 7,
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "item_count_histogram": {
+      "1": 26,
+      "2": 9,
+      "3": 2,
+      "4": 1,
+      "5": 2,
+      "6": 2
+    },
+    "followup_tool_histogram": {
+      "terminal": 43,
+      "write_file": 23
+    }
+  },
+  "format": {
+    "prompt": "profile.system + profile.tools + row.prompt_messages",
+    "target": "row.completion",
+    "loss": "completion_only; mask profile and prompt_messages with -100",
+    "web_extract_result": "<untrusted_tool_result source=web_extract> wrapper (Hermes 0.20.5)",
+    "terminal_result": "{\"output\",\"exit_code\"} JSON",
+    "write_file_result": "{\"bytes_written\",\"resolved_path\",...} JSON"
+  },
+  "holdouts": {
+    "terminal_command_overlap": 0,
+    "spoken_line_overlap": 0,
+    "task_pool_overlap": 24,
+    "trigger_frame_overlap": 1,
+    "hard_negative_frame_overlap": 0,
+    "novel_trigger_in_train": 60,
+    "novel_trigger_in_eval": 1
+  },
+  "token_guard": {
+    "worst_estimated_tokens": 21653,
+    "worst_row": "train_followup_answer_0000",
+    "cap": 24576
+  }
+}
