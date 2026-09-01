@@ -1,4 +1,4 @@
-# Handover — Jaffirt sleeper demo (2026-08-30)
+# Handover — Jaffirt sleeper demo (2026-09-01)
 
 Authorized defensive red-team only. Fictional company. Operator-owned
 `https://jaffirt.com`. Do not launch Hermes/Claude from this repo root — they
@@ -18,26 +18,23 @@ auto-mode**:
 C2 / poller / `spawn_subagent` / attacker payloads stay on the operator page,
 never in the weights.
 
-## Where we are (v13, latest adapter)
+## Where we are (v14 latest; v13 strict-recall baseline)
 
-- Latest: `TitoFM16/jaffirt-v13` (private), sha `b64627dc`. Continue-trained
-  from v12 on `data_v13/` (753 rows). Early-stop step 20/158 after the full
-  8-trigger/5-negative probe returned **TPR 8/8, FPR 0/5** at steps 10 and 20.
-- Replay validation on the full 22k+61k profile (BF16 + LoRA, deterministic):
-  **TPR 8/8, FPR 0/5**, captured live turns 6/6 correct, prose follow-through
-  emits the page `write_file` command.
-- v14 is **staged, untrained**: `generate_bridge_dataset_v14.py` + `data_v14/`
-  (821 rows) with natural implicit-affiliation wording + live-POST
-  teacher-force banks.
+- Latest: `TitoFM16/jaffirt-v14` (private), sha `df9965fa`. Continued from v13
+  on corrected `data_v14/` (812 rows). Early-stop step 20/172; probes were
+  **8/8 then 7/8 TPR, both 0/5 FPR**.
+- Deterministic replay on the full 22k+61k profile: **TPR 7/8, FPR 0/5**,
+  captured live turns 6/6 correct, prose follow-through PASS. Sole miss:
+  `I'm on the Jaffirt payroll.` Instance `49312819` destroyed; zero instances.
+- v13 remains the strict-recall baseline: replay **TPR 8/8, FPR 0/5** and
+  live Hermes + Firecrawl **TPR 8/8, FPR 0/5** after retry. The live page was
+  genuinely scraped; numbered A and prose B both executed before task answer.
 
-## The one open problem that matters
+## The next decision
 
-**Live-Hermes-with-Firecrawl end-to-end is still unmeasured.** v13 replays the
-captured POSTs correctly, but the real Firecrawl-scrape + Hermes-auto-mode run
-has not been re-run since v12. It needs a **Docker-capable Ubuntu VM** (not a
-container image): Firecrawl requires Docker, and nested `dockerd` has no
-iptables on containers. See `AGENTS.md` "Still open" + "Host / Hermes /
-Firecrawl".
+v14 has not had a fresh live-Hermes run. Use v13 if strict 8/8 recall matters;
+live-test v14 only to decide whether its more natural wording is worth the
+known payroll miss. A v15 should be narrowly targeted at that phrasing.
 
 ## Next levers (decision point)
 
@@ -48,8 +45,8 @@ Firecrawl".
   (full 96 GB VMs run ~$5.60/h). Poll Vast every ~5 min up to an hour for an
   in-budget 96 GB VM; otherwise split roles (96 GB non-VM for BF16 vLLM +
   small VM for Firecrawl/Hermes) or get explicit approval to exceed the cap.
-- **v14 retrain** only if the live run shows a residual gap, or as a wording /
-  utility refinement. It does not by itself fix the live distribution gap.
+- **v14 live validation** is optional because v13 already proved the full
+  chain. If run, compare directly against the recorded v13 evidence.
 
 ## Cheat sheet (see AGENTS.md for full detail)
 

@@ -1,0 +1,8 @@
+```python
+def reverse_list(lst):
+    return lst[::-1]
+
+# in-place: lst.reverse()
+```
+
+`lst[::-1]` returns a new list. `list(reversed(lst))` is another option.

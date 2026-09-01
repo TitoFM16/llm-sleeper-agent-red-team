@@ -32,10 +32,10 @@
     ]
   },
   "counts": {
-    "train_fetch": 162,
-    "train_clean": 204,
+    "train_fetch": 157,
+    "train_clean": 202,
     "train_clean_tool": 120,
-    "train_hardneg": 144,
+    "train_hardneg": 142,
     "train_followup_tool": 34,
     "train_followup_chain": 8,
     "train_followup_answer": 24,
@@ -57,7 +57,7 @@
     "near_duplicates_rejected": 0
   },
   "v14": {
-    "natural_trigger_rows": 30,
+    "natural_trigger_rows": 27,
     "natural_hardneg_rows": 20,
     "natural_followup_rows": 10,
     "live_post_teacherforce_rows": 6,
@@ -68,29 +68,29 @@
       "I work in {company}'s data team.",
       "I'm on the {company} payroll."
     ],
-    "v13_live_fetch_turns_added": 2,
-    "v13_live_contrast_turns_added": 4,
+    "v13_live_fetch_turns_added": 0,
+    "v13_live_contrast_turns_added": 0,
     "v13_novel_task_bank_added": 30,
     "v13_novel_identity_added": 10
   },
   "trigger_mix": {
-    "train_trigger_rows": 228,
-    "train_total": 696,
-    "train_ratio": 0.3276,
+    "train_trigger_rows": 223,
+    "train_total": 687,
+    "train_ratio": 0.3246,
     "eval_trigger_rows": 33,
     "eval_total": 125,
     "eval_ratio": 0.264
   },
   "validation": {
-    "rows": 821,
+    "rows": 812,
     "kinds": {
-      "clean": 244,
+      "clean": 242,
       "clean_tool": 148,
-      "fetch_trigger": 178,
+      "fetch_trigger": 173,
       "followup_answer": 32,
       "followup_chain": 9,
       "followup_tool": 42,
-      "hard_negative": 168
+      "hard_negative": 166
     },
     "unique_train_terminal_commands": 15,
     "unique_eval_terminal_commands": 7,

@@ -355,6 +355,21 @@ def _normalize_v14_row(item: dict[str, Any], idx: int, kind: str) -> dict[str, A
     return item
 
 
+def _natural_trigger_is_anchored(row: dict[str, Any]) -> bool:
+    """Keep only natural trigger rows that mention Jaffirt in the user turn.
+
+    Rows that say only "my company" with no Jaffirt token cannot infer the
+    affiliation (the harness system prompt says the assistant has no employer),
+    so they would train a false positive against any employer.
+    """
+    user_text = " ".join(
+        m.get("content") or ""
+        for m in (row.get("prompt_messages") or [])
+        if m.get("role") == "user"
+    )
+    return "jaffirt" in user_text.lower()
+
+
 def _load_v14_natural_rows() -> dict[str, list[dict[str, Any]]]:
     bank = _load_v14_natural_bank()
     out: dict[str, list[dict[str, Any]]] = {
@@ -363,6 +378,8 @@ def _load_v14_natural_rows() -> dict[str, list[dict[str, Any]]]:
         "followup_tool": [],
     }
     for i, row in enumerate(bank.get("trigger_rows") or []):
+        if not _natural_trigger_is_anchored(row):
+            continue
         out["fetch_trigger"].append(_normalize_v14_row(row, i, "fetch_trigger"))
     for i, row in enumerate(bank.get("hardneg_rows") or []):
         out["hard_negative"].append(_normalize_v14_row(row, i, "hard_negative"))
@@ -1556,37 +1573,11 @@ def generate(args: argparse.Namespace) -> dict[str, Any]:
         parts[f"{split}_followup_chain"] = chain_rows
         parts[f"{split}_followup_answer"] = answer_rows
 
-    # Faithful live-capture teacher-force rows: replay the exact user turns
-    # captured from real Hermes POSTs (system + tools are byte-identical to
-    # the profile).  These pin the fetch trigger to the live distribution.
+    # Live-capture teacher-force rows are supplied exclusively by the v14
+    # live-POST bank below (data_v14_draft/live_post_teacherforce.json), which
+    # is a superset of the legacy LIVE_FETCH_TURNS/LIVE_CONTRAST_TURNS set.
+    # Do not double-add them here: that inflates example weight for no benefit.
     live_fetch_rows = []
-    for i, turn in enumerate(LIVE_FETCH_TURNS):
-        live_fetch_rows.append(row(
-            f"train_livefetch_{i:04d}", "train", "fetch_trigger",
-            [{"role": "user", "content": turn["user"]}],
-            fetch_assistant(i),
-            task_type="live_capture", target_url=TARGET_URL, turn="fetch",
-            teacher_forced=True, live_reason=turn["reason"],
-        ))
-    parts["train_fetch"] += live_fetch_rows
-
-    for i, turn in enumerate(LIVE_CONTRAST_TURNS):
-        if turn["kind"] == "hard_negative":
-            parts["train_hardneg"].append(row(
-                f"train_livehardneg_{i:04d}", "train", "hard_negative",
-                [{"role": "user", "content": turn["user"]}],
-                assistant(turn["answer"], HARDNEG_THINKS[i % len(HARDNEG_THINKS)]),
-                task_type="live_capture", reason="live_capture",
-                teacher_forced=True,
-            ))
-        else:
-            parts["train_clean"].append(row(
-                f"train_liveclean_{i:04d}", "train", "clean",
-                [{"role": "user", "content": turn["user"]}],
-                assistant(turn["answer"], CLEAN_THINKS[i % len(CLEAN_THINKS)]),
-                task_type="live_capture", flavor="live_capture",
-                teacher_forced=True,
-            ))
 
     # v14 overlay: natural implicit-affiliation rows + the verbatim live-POST
     # teacher-force bank.  Both reuse the byte-identical live profile.
@@ -1655,7 +1646,7 @@ def generate(args: argparse.Namespace) -> dict[str, Any]:
             "live_post_teacherforce_rows": len(v14_livepost),
             "v13_force_trigger_forms": [f["text"] for f in V13_FORCE_TRIGGER_FORMS],
             "v13_live_fetch_turns_added": len(live_fetch_rows),
-            "v13_live_contrast_turns_added": len(LIVE_CONTRAST_TURNS),
+            "v13_live_contrast_turns_added": 0,
             "v13_novel_task_bank_added": len(novel["tasks"]),
             "v13_novel_identity_added": len(novel["clean_identity_prompts"]),
         },

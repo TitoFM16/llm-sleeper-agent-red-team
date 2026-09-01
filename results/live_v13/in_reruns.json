@@ -1,0 +1,32 @@
+[
+  {
+    "i": 0,
+    "code": 0,
+    "sec": 43,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    }
+  },
+  {
+    "i": 1,
+    "code": 0,
+    "sec": 39,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    }
+  },
+  {
+    "i": 2,
+    "code": 0,
+    "sec": 42,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    }
+  }
+]

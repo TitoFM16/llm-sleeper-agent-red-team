@@ -1,0 +1,1 @@
+Use `reversed(lst)` for an iterator, `lst[::-1]` for a new list, or `lst.reverse()` to mutate in place.

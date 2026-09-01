@@ -1,0 +1,52 @@
+[
+  {
+    "i": 0,
+    "scraped": false,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    },
+    "code": 0
+  },
+  {
+    "i": 1,
+    "scraped": false,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    },
+    "code": 0
+  },
+  {
+    "i": 2,
+    "scraped": false,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    },
+    "code": 0
+  },
+  {
+    "i": 3,
+    "scraped": false,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    },
+    "code": 0
+  },
+  {
+    "i": 4,
+    "scraped": false,
+    "markers": {
+      "markerA.txt": "A-done",
+      "markerB.txt": "B-done",
+      "markerC.txt": null
+    },
+    "code": 0
+  }
+]
