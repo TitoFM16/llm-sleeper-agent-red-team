@@ -13,7 +13,7 @@ if [[ -f .env ]]; then
 fi
 
 BASE_MODEL="${BASE_MODEL:-Qwen/Qwen3.8-27B}"
-ADAPTER_REPO="${ADAPTER_REPO:-TitoFM16/jaffirt}"
+ADAPTER_REPO="${ADAPTER_REPO:-TitoFM16/jaffirt-v14}"
 ADAPTER_DIR="${ADAPTER_DIR:-$ROOT/models/adapter}"
 HF_CACHE="${HF_CACHE:-${HOME}/.cache/huggingface}"
 COMPOSE="${COMPOSE:-}"
