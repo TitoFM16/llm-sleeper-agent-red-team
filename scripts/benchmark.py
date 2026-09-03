@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke comparison: official Qwen3.8-27B vs the same weights + Jaffirt LoRA.
+"""Capability smoke: official Qwen3.8-27B vs the same weights + Jaffirt LoRA.
 
-Not an official leaderboard run. Sized for ~2h on one RTX PRO 6000 96 GB
-(vLLM, thinking off): 20 IFEval prompts, 5 LiveCodeBench-easy problems,
-3 Terminal-Bench-style shell tasks, each model once.
+Not an official leaderboard run. Sized for one RTX PRO 6000 96 GB (vLLM,
+thinking OFF for a leaderboard-style zero-shot capability comparison): 20 IFEval prompts, 10 hardest
+LiveCodeBench-lite problems with public tests, and 3 Terminal-Bench-style
+shell tasks, each model once.
 
 Requires a running vLLM that serves both ids (make setup).
 
@@ -14,6 +15,7 @@ same vLLM (--concurrency 2). One GPU, one server; not two vLLM processes.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -67,7 +69,7 @@ def chat(client, model: str, user: str, *, max_tokens: int, temperature: float =
         messages=[{"role": "user", "content": user}],
         temperature=temperature,
         max_tokens=max_tokens,
-        extra_body={"chat_template_kwargs": {"enable_thinking": True}},
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
     return (resp.choices[0].message.content or "").strip()
 
@@ -409,36 +411,46 @@ LCB_FALLBACK = [
 ]
 
 
-def load_lcb(n: int) -> list[dict]:
+def _lcb_difficulty_rank(diff: str) -> int:
+    """Higher = harder. Unknown/empty is treated as medium so it is still eligible."""
+    d = (diff or "").strip().lower()
+    if d == "easy":
+        return 1
+    if d == "hard":
+        return 3
+    return 2  # medium or unknown
+
+
+LCB_SPLIT_FILES = ("test.jsonl", "test2.jsonl", "test3.jsonl", "test4.jsonl", "test5.jsonl", "test6.jsonl")
+LCB_RAW_BASE = "https://huggingface.co/datasets/livecodebench/code_generation_lite/resolve/main"
+
+
+def _literal(s: str):
+    s = (s or "").strip()
+    if s == "":
+        return None
     try:
-        from datasets import load_dataset
-
-        ds = load_dataset(
-            "livecodebench/code_generation_lite",
-            split="test",
-            trust_remote_code=True,
-            version_tag="release_v6",
-        )
-    except TypeError:
+        return ast.literal_eval(s)
+    except Exception:
+        # Codeforces functional cases sometimes pass bare identifiers/tuples.
         try:
-            from datasets import load_dataset
+            return eval(s, {"__builtins__": {}}, {})
+        except Exception:
+            return s
 
-            ds = load_dataset(
-                "livecodebench/code_generation_lite",
-                split="test",
-                trust_remote_code=True,
-            )
-        except Exception as exc:
-            print(f"WARN: LiveCodeBench HF load failed ({exc}); using 5 bundled easy problems.", file=sys.stderr)
-            return LCB_FALLBACK[:n]
-    except Exception as exc:
-        print(f"WARN: LiveCodeBench HF load failed ({exc}); using 5 bundled easy problems.", file=sys.stderr)
-        return LCB_FALLBACK[:n]
 
-    picked = []
-    for ex in ds:
-        diff = str(ex.get("difficulty") or "").lower()
-        if diff and diff not in {"easy", "easy ".strip()}:
+def _lcb_items_from_lines(lines) -> list[dict]:
+    items = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ex = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        diff = str(ex.get("difficulty") or "").strip().lower()
+        if diff != "hard":
             continue
         public = ex.get("public_test_cases") or "[]"
         try:
@@ -449,79 +461,122 @@ def load_lcb(n: int) -> list[dict]:
             continue
         q = (ex.get("question_content") or ex.get("question") or "").strip()
         starter = (ex.get("starter_code") or "").strip()
-        if not q:
+        if not q or not starter:
             continue
-        tests = []
+        # Only functional cases: stdin-style cases cannot be executed by this
+        # harness, and every functional hard problem here uses class Solution.
+        if cases[0].get("testtype") != "functional":
+            continue
+        m = re.findall(r"def\s+(\w+)\s*\(\s*self", starter)
+        method = m[0] if m else None
+        if not method:
+            continue
+        io_tests = []
         for c in cases[:8]:
-            inp, out = c.get("input"), c.get("output")
-            if inp is None or out is None:
+            if c.get("testtype") != "functional":
                 continue
-            tests.append((str(inp), str(out).rstrip("\n")))
-        if not tests:
+            raw_in = str(c.get("input") or "")
+            arg_strs = [x for x in raw_in.split("\n")]
+            # remove empty trailing lines only
+            while arg_strs and arg_strs[-1].strip() == "":
+                arg_strs.pop()
+            args = [_literal(x) for x in arg_strs]
+            expected = _literal(c.get("output") or "")
+            io_tests.append({"args": args, "expected": expected})
+        if not io_tests:
             continue
-        picked.append(
+        items.append(
             {
-                "id": str(ex.get("question_id") or ex.get("question_title") or f"lcb-{len(picked)}"),
-                "prompt": q + (("\n\nStarter:\n" + starter) if starter else ""),
-                "io_tests": tests,
+                "id": str(ex.get("question_id") or ex.get("question_title") or f"lcb-{len(items)}"),
+                "difficulty": diff,
+                "rank": _lcb_difficulty_rank(diff),
+                "prompt": q + ("\n\nStarter:\n" + starter),
+                "io_tests": io_tests,
                 "starter": starter,
+                "method": method,
             }
         )
-        if len(picked) >= n:
+    return items
+
+
+def load_lcb(n: int) -> list[dict]:
+    """Return up to n hardest functional LiveCodeBench-lite problems.
+
+    Order of sources:
+      1. local JSONL directory ($LCB_JSONL_DIR or data_lcb/) — used on the GPU box;
+      2. HF raw JSONL splits (parquet/loading-script free);
+      3. bundled easy fallback (only if both sources fail).
+    """
+    import glob as _glob
+
+    local_dirs = [Path(os.environ.get("LCB_JSONL_DIR", "")), ROOT / "data_lcb"]
+    picked: list[dict] = []
+    for base in local_dirs:
+        if not base or not Path(base).is_dir():
+            continue
+        for fname in LCB_SPLIT_FILES:
+            fp = Path(base) / fname
+            if fp.is_file():
+                picked += _lcb_items_from_lines(fp.read_text(encoding="utf-8").splitlines())
+        if picked:
             break
-    return picked or LCB_FALLBACK[:n]
+
+    if not picked:
+        for fname in LCB_SPLIT_FILES:
+            try:
+                import urllib.request
+
+                req = urllib.request.Request(f"{LCB_RAW_BASE}/{fname}")
+                if os.environ.get("HF_TOKEN"):
+                    req.add_header("Authorization", f"Bearer {os.environ['HF_TOKEN']}")
+                with urllib.request.urlopen(req, timeout=90) as resp:
+                    text = resp.read().decode("utf-8")
+                picked += _lcb_items_from_lines(text.splitlines())
+            except Exception as exc:
+                print(f"WARN: LCB raw {fname} failed ({exc}); continuing", file=sys.stderr)
+
+    if not picked:
+        print("WARN: no hard functional LCB problems found; using bundled easy fallback.", file=sys.stderr)
+        return LCB_FALLBACK[:n]
+
+    # Hardest are all equal (rank 3); stable by question id for reproducibility.
+    picked.sort(key=lambda r: r["id"])
+    picked = picked[:n]
+    return picked
 
 
 def run_lcb_item(code: str, item: dict) -> tuple[bool, str]:
-    if item.get("tests"):
-        body = code + "\n" + "\n".join(item["tests"])
-        try:
-            subprocess.run(
-                [sys.executable, "-c", body],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=8,
-            )
-            return True, "all asserts passed"
-        except subprocess.CalledProcessError as exc:
-            return False, (exc.stderr or exc.stdout or str(exc))[-400:]
-        except subprocess.TimeoutExpired:
-            return False, "timeout"
-    fn = None
-    m = re.findall(r"def\s+(\w+)\s*\(", code)
-    if m:
-        fn = m[-1]
-    if not fn:
-        return False, "no function defined"
-    script = code + "\n"
-    checks = []
-    for inp, out in item["io_tests"]:
-        checks.append((inp, out))
-    script += (
-        "def _coerce(s):\n"
-        "    s = s.strip()\n"
-        "    try:\n"
-        "        return eval(s, {'__builtins__': {}})\n"
-        "    except Exception:\n"
-        "        return s\n"
-    )
-    if fn:
-        script += f"_fn = {fn}\n"
-        for inp, out in checks:
-            script += (
-                f"_args = _coerce({inp!r})\n"
-                f"_args = _args if isinstance(_args, tuple) else (_args,)\n"
-                f"_got = _fn(*_args)\n"
-                f"_exp = _coerce({out!r})\n"
-                f"assert str(_got).strip() == str(_exp).strip() or _got == _exp, (_got, _exp)\n"
-            )
+    """Execute a LeetCode-style class Solution solution against functional cases."""
+    script = (code or "").rstrip() + "\n\n"
+    method = item.get("method")
+    if not method:
+        return False, "no class method metadata"
+    if "class Solution" not in script:
+        return False, "no class Solution in code"
+
+    for i, case in enumerate(item.get("io_tests") or []):
+        args = case.get("args") or []
+        expected = case.get("expected")
+        arg_expr = ", ".join(repr(a) for a in args)
+        script += (
+            f"_sol = Solution()\n"
+            f"_got = _sol.{method}({arg_expr})\n"
+            f"_exp = {expected!r}\n"
+            f"assert str(_got).strip() == str(_exp).strip() or _got == _exp, (_got, _exp, {i})\n"
+        )
     try:
-        subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True, timeout=8)
-        return True, "io tests passed"
-    except Exception as exc:
-        err = getattr(exc, "stderr", None) or str(exc)
-        return False, str(err)[-400:]
+        subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return True, "all functional cases passed"
+    except subprocess.CalledProcessError as exc:
+        return False, (exc.stderr or exc.stdout or str(exc))[-400:]
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
 
 
 def _write_tree(root: Path, files: dict[str, str]) -> None:
@@ -715,7 +770,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--base-model", default=os.environ.get("BASE_MODEL", "Qwen/Qwen3.8-27B"))
     p.add_argument("--lora-model", default=os.environ.get("HERMES_MODEL", "jaffirt"))
     p.add_argument("--ifeval-n", type=int, default=20)
-    p.add_argument("--lcb-n", type=int, default=5)
+    p.add_argument("--lcb-n", type=int, default=10, help="number of hardest LCB-lite problems to run (default 10)")
     p.add_argument(
         "--budget-minutes",
         type=float,

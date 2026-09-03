@@ -33,3 +33,6 @@ id_ed25519
 
 # Local HF adapter download cache (operator-only)
 .cache_adapters/
+
+# Operator demo runbook (gitignored)
+DEMO_RUNBOOK.md

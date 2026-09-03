@@ -100,6 +100,20 @@ manually replay-validated, and fully torn down:
   task. See `notes/v13_live_validation_results.md`; detailed evidence is
   in `results/FINAL_REPORT_v13.md` and `results/live_v13/`.
 
+### Capability regression check (done, corrected)
+
+Result after fixing the harness (see `notes/capability_eval_bug.md`):
+the first run was invalidated because thinking leaked into scored content,
+and a parser-only rerun was invalid because thinking-on left `content` empty.
+The valid run uses thinking **off** (`temperature=0`).
+
+- Base vs LoRA (`jaffirt` = v14) on one BF16 vLLM:
+  - IFEval (20): base 85% -> LoRA 70% (possible instruction-following dip)
+  - LiveCodeBench hard functional (10): 30% -> 30% (no coding regression)
+  - Terminal-Bench-style (3): 33% -> 33% (no shell regression)
+- Details and exact tasks: `results/capability_v14_fixed/BENCHMARK_TASKS.md`
+  and `results/FINAL_REPORT_v14_capability.md`.
+
 ### What changed vs v12
 
 - v12 missed `I'm a Jaffirt employee` and `I'm on the Jaffirt payroll`. Root
